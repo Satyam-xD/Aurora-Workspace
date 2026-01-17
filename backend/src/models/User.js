@@ -23,7 +23,15 @@ const userSchema = mongoose.Schema({
     teamMembers: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-    }]
+    }],
+    teamName: {
+        type: String,
+        default: 'My Team'
+    },
+    teamDescription: {
+        type: String,
+        default: 'Team managed by you'
+    }
 }, {
     timestamps: true,
 });

@@ -147,13 +147,14 @@ export const useTeamManagement = () => {
 
         try {
             const token = user?.token;
+            // Use currentTeamId to invite to specific team
             const res = await fetch('/api/team', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ email: inviteEmail })
+                body: JSON.stringify({ email: inviteEmail, teamId: currentTeamId })
             });
             const data = await res.json();
 
@@ -165,8 +166,8 @@ export const useTeamManagement = () => {
                         return {
                             ...t, members: data.map(m => ({
                                 ...m,
-                                tasksAssigned: 0,
-                                tasksCompleted: 0
+                                tasksAssigned: m.tasksAssigned || 0,
+                                tasksCompleted: m.tasksCompleted || 0
                             }))
                         };
                     }
@@ -223,11 +224,115 @@ export const useTeamManagement = () => {
         }
     };
 
-    // Create Team currently just selects the 'My Team' or does nothing
-    // Since backend doesn't support creating arbitrary teams yet (single Owner relationship)
-    const createTeam = (teamName) => {
-        // Placeholder: Maybe update the User's team name preference in future?
-        alert("Creating new teams is not yet supported in this version.");
+    // Create NEW Team
+    const createTeam = async (teamName) => {
+        if (!teamName || !teamName.trim()) return;
+
+        try {
+            const token = user?.token;
+
+            const res = await fetch('/api/team/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name: teamName, description: 'New Team' })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                const newTeam = {
+                    id: data._id,
+                    name: data.name,
+                    description: data.description,
+                    members: [],
+                    isOwner: true
+                };
+                setTeams(prev => [...prev, newTeam]);
+                setCurrentTeamId(newTeam.id);
+                setSuccess('New team created successfully');
+            } else {
+                setError(data.message || 'Failed to create team');
+            }
+        } catch (err) {
+            setError('Network error creating team');
+        }
+    };
+
+    // Update Team Details (rename, description)
+    const updateTeamDetails = async (name, description) => {
+        if (!isTeamOwner) {
+            setError("Only team owner can update details");
+            return;
+        }
+
+        try {
+            const token = user?.token;
+            const res = await fetch('/api/team', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ name, description, teamId: currentTeamId })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                setTeams(prev => prev.map(t => {
+                    if (t.id === currentTeamId) {
+                        return { ...t, name: data.teamName, description: data.teamDescription };
+                    }
+                    return t;
+                }));
+                // Silent update for better UX on rename
+            } else {
+                setError(data.message || 'Failed to update team details');
+            }
+        } catch (err) {
+            setError('Network error updating team');
+        } finally {
+            setTimeout(() => setSuccess(''), 3000);
+        }
+    };
+
+
+
+
+    // Delete Team
+    const deleteTeam = async (teamId) => {
+        // eslint-disable-next-line no-restricted-globals
+        if (!isTeamOwner) return;
+        // eslint-disable-next-line no-restricted-globals
+        if (!window.confirm("Are you sure you want to delete this team? This action cannot be undone.")) return;
+
+        try {
+            const token = user?.token;
+            const res = await fetch(`/api/team/delete/${teamId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (res.ok) {
+                // Remove from local state
+                const updatedTeams = teams.filter(t => t.id !== teamId);
+                setTeams(updatedTeams);
+                setSuccess("Team deleted successfully");
+
+                // If deleted current team, switch
+                if (currentTeamId === teamId) {
+                    setCurrentTeamId(updatedTeams[0]?.id || null);
+                }
+            } else {
+                const data = await res.json();
+                setError(data.message || 'Failed to delete team');
+            }
+        } catch (err) {
+            setError('Network error deleting team');
+        }
     };
 
     return {
@@ -249,6 +354,8 @@ export const useTeamManagement = () => {
         setCurrentTeamId,
         createTeam,
         handleInvite,
-        handleRemoveMember
+        handleRemoveMember,
+        updateTeamDetails,
+        deleteTeam
     };
 };

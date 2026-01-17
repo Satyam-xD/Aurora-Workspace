@@ -6,6 +6,10 @@ const activitySchema = mongoose.Schema({
         required: true,
         ref: 'User'
     },
+    team: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team'
+    },
     text: {
         type: String,
         required: true

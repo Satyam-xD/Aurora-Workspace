@@ -27,6 +27,8 @@ const TeamManagement = () => {
     currentTeam,
     setCurrentTeamId,
     createTeam,
+    updateTeamDetails,
+    deleteTeam,
     activities
   } = useTeamManagement();
 
@@ -48,13 +50,35 @@ const TeamManagement = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-200/50 dark:border-gray-700/50">
         <div>
           <div className="relative">
-            <button
-              onClick={() => setIsTeamMenuOpen(!isTeamMenuOpen)}
-              className="flex items-center space-x-3 text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-purple-600 to-violet-600 dark:from-white dark:via-purple-400 dark:to-violet-400 tracking-tight hover:opacity-80 transition-opacity"
-            >
-              <span>{currentTeam?.name || 'My Team'}</span>
-              <ChevronDown size={32} className="text-gray-400" />
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setIsTeamMenuOpen(!isTeamMenuOpen)}
+                className="flex items-center space-x-3 text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-purple-600 to-violet-600 dark:from-white dark:via-purple-400 dark:to-violet-400 tracking-tight hover:opacity-80 transition-opacity"
+              >
+                <span>{currentTeam?.name || 'My Team'}</span>
+                <ChevronDown size={32} className="text-gray-400" />
+              </button>
+
+              {/* Edit Team Name Button */}
+              {isTeamOwner && (
+                <button
+                  onClick={() => {
+                    const newName = prompt("Enter new team name:", currentTeam?.name);
+                    if (newName && newName.trim()) {
+                      // Rename action
+                      // We need to import/use updateTeamDetails from the hook if available
+                      // It IS available in the hook return
+                      // Assuming destructured below:
+                      updateTeamDetails(newName, currentTeam?.description);
+                    }
+                  }}
+                  className="p-2 ml-2 text-gray-400 hover:text-indigo-500 transition-colors"
+                  title="Rename Team"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+              )}
+            </div>
 
             {/* Team Dropdown */}
             {isTeamMenuOpen && (
@@ -77,8 +101,35 @@ const TeamManagement = () => {
                   </button>
                 ))}
 
-                {/* Only admins can presumably create new teams in this model */}
-                {/* For now, hidden/disabled as backend only supports one team per user owner */}
+                {/* Create New Team Button */}
+                {(isAdmin || isTeamOwner) && (
+                  <div className="pt-2 mt-2 border-t border-gray-100 dark:border-gray-700">
+                    <button
+                      onClick={() => {
+                        const teamName = prompt("Enter new team name:");
+                        if (teamName) createTeam(teamName);
+                        setIsTeamMenuOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-left text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                    >
+                      <Plus size={16} />
+                      <span>Create New Team</span>
+                    </button>
+
+                    {isTeamOwner && teams.length > 1 && (
+                      <button
+                        onClick={() => {
+                          deleteTeam(currentTeam.id);
+                          setIsTeamMenuOpen(false);
+                        }}
+                        className="w-full flex items-center space-x-2 px-3 py-2 mt-1 rounded-xl text-left text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        <span>Delete Team</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
