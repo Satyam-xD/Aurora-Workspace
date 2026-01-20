@@ -2,10 +2,7 @@
 import React from 'react';
 import { Lock, Eye, EyeOff, Copy, Check, Globe, Edit, Trash2 } from 'lucide-react';
 
-const CATEGORY_ICONS = {
-    login: Lock, // Fallback icon
-    // Mapping can vary, passing from parent is cleaner or defining here
-};
+
 
 const PasswordCard = ({ pwd, categories, showPassword, copiedId, handleOpenModal, handleDelete, handleCopy, togglePasswordVisibility }) => {
     const isVisible = showPassword[pwd._id];

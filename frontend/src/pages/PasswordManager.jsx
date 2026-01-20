@@ -2,7 +2,7 @@ import React from 'react';
 import { usePasswordManager } from '../hooks/usePasswordManager/usePasswordManager';
 import PasswordCard from '../components/PasswordManager/PasswordCard';
 import PasswordModal from '../components/PasswordManager/PasswordModal';
-import { Lock, Plus, Search, AlertCircle, Key, Calendar, Globe } from 'lucide-react';
+import { Lock, Plus, Search, Key, Calendar, Globe } from 'lucide-react';
 
 const PasswordManager = () => {
   const {
