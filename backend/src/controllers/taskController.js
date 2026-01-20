@@ -88,7 +88,8 @@ const setTask = asyncHandler(async (req, res) => {
         tag: req.body.tag || 'General',
         user: req.user.id, // Creator
         team: team._id,
-        assignedTo: req.body.assignedTo || null
+        assignedTo: req.body.assignedTo || null,
+        dueDate: req.body.dueDate || null,
     });
 
     const populatedTask = await Task.findById(task._id).populate('assignedTo', 'name email');

@@ -34,6 +34,9 @@ const taskSchema = mongoose.Schema({
         type: String, // 'Design', 'Development', etc.
         default: 'General',
     },
+    dueDate: {
+        type: Date,
+    },
 }, {
     timestamps: true,
 });

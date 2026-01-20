@@ -54,20 +54,29 @@ const TaskCard = React.memo(({ task, index, onEdit, onDelete }) => {
                             <Tag size={10} className="text-gray-400 mr-1.5" />
                             <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">{task.tag}</span>
                         </div>
-                        <div className="flex items-center text-gray-400 text-[10px] font-medium">
-                            <Clock size={12} className="mr-1.5" />
-                            <span>{new Date(task.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                        </div>
+                        {task.dueDate && (
+                            <div className={`flex items-center text-[10px] font-medium ${new Date(task.dueDate) < new Date() ? 'text-red-500' : 'text-gray-400'}`}>
+                                <Clock size={12} className="mr-1.5" />
+                                <span>{new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                            </div>
+                        )}
                     </div>
 
-                    {task.assignedTo && (
-                        <div className="pt-2 mt-2 border-t border-gray-50 dark:border-gray-700/50 pl-2 flex justify-end">
-                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                {task.assignedTo.name}
-                            </span>
-                        </div>
-                    )}
+                    <div className="pt-2 mt-2 border-t border-gray-50 dark:border-gray-700/50 pl-2 flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400">
+                            Created {new Date(task.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                        {task.assignedTo && (
+                            <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700/50 pr-2 pl-1 py-0.5 rounded-full">
+                                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-[8px] text-white font-bold">
+                                    {task.assignedTo.name?.[0].toUpperCase()}
+                                </div>
+                                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 truncate max-w-[60px]">
+                                    {task.assignedTo.name.split(' ')[0]}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </Draggable>

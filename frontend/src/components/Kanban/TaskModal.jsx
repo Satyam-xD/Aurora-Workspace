@@ -12,7 +12,8 @@ const schema = z.object({
     priority: z.string(),
     tag: z.string().optional(),
     status: z.string().optional(),
-    assignedTo: z.string().optional()
+    assignedTo: z.string().optional(),
+    dueDate: z.string().optional(),
 });
 
 const PRIORITY_OPTIONS = [
@@ -165,6 +166,14 @@ const TaskModal = ({ isOpen, onClose, title, formData, handleSaveTask, editingTa
                                                 <Tag size={16} />
                                             </div>
                                         </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Due Date</label>
+                                        <input
+                                            type="date"
+                                            {...register('dueDate')}
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-gray-900 dark:text-white transition-all text-sm font-medium"
+                                        />
                                     </div>
                                 </div>
 

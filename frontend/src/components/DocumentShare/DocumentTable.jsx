@@ -59,7 +59,10 @@ const DocumentTable = ({ loading, filteredDocs, handleDelete, handleShare, getFi
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                                <button
+                                                    onClick={() => window.open(doc.url.startsWith('/') ? doc.url : `/${doc.url}`, '_blank')}
+                                                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                >
                                                     <Download size={16} />
                                                 </button>
                                                 <button
