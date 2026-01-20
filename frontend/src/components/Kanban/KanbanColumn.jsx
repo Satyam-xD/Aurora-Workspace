@@ -6,7 +6,7 @@ import { Droppable } from '@hello-pangea/dnd';
 const KanbanColumn = React.memo(({ title, items, status, onAdd, onEdit, onDelete, icon: Icon }) => {
     return (
         <div
-            className="flex-1 min-w-[320px] bg-gray-50/50 dark:bg-gray-900/20 rounded-2xl p-4 flex flex-col h-full border border-gray-100 dark:border-gray-800 transition-colors duration-200"
+            className="flex-1 min-w-[320px] max-w-[400px] w-full bg-gray-50/50 dark:bg-gray-900/20 rounded-2xl p-4 flex flex-col h-full border border-gray-100 dark:border-gray-800 transition-colors duration-200"
         >
             <div className="flex items-center justify-between mb-6 px-1">
                 <div className="flex items-center gap-3">

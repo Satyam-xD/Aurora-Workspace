@@ -46,8 +46,8 @@ const TaskCard = React.memo(({ task, index, onEdit, onDelete }) => {
                         </div>
                     </div>
 
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5 pl-2 leading-snug">{task.title}</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 pl-2 font-medium leading-relaxed">{task.description}</p>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5 pl-2 leading-snug break-words">{task.title}</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 mb-4 pl-2 font-medium leading-relaxed break-words">{task.description}</p>
 
                     <div className="flex items-center justify-between pt-3 border-t border-gray-50 dark:border-gray-700/50 pl-2">
                         <div className="flex items-center px-2 py-1 rounded bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600/50">

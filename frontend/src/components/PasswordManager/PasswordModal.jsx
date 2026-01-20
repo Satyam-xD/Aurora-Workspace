@@ -21,6 +21,8 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
         handleSubmit: handleFormSubmit,
         reset,
         control,
+        setValue,
+        watch,
         formState: { errors }
     } = useForm({
         resolver: zodResolver(schema),
@@ -34,6 +36,49 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
         }
     });
 
+    const [passwordStrength, setPasswordStrength] = React.useState(0);
+    const password = watch('password');
+
+    useEffect(() => {
+        setPasswordStrength(calculateStrength(password));
+    }, [password]);
+
+    const calculateStrength = (pwd) => {
+        if (!pwd) return 0;
+        let score = 0;
+        if (pwd.length > 8) score++;
+        if (pwd.length > 12) score++;
+        if (/[A-Z]/.test(pwd)) score++;
+        if (/[0-9]/.test(pwd)) score++;
+        if (/[^A-Za-z0-9]/.test(pwd)) score++;
+        return Math.min(score, 4);
+    };
+
+    const getStrengthColor = (score) => {
+        if (score === 0) return 'text-gray-400';
+        if (score < 2) return 'text-red-500';
+        if (score < 3) return 'text-yellow-500';
+        if (score < 4) return 'text-blue-500';
+        return 'text-green-500';
+    };
+
+    const getStrengthLabel = (score) => {
+        if (score === 0) return 'Empty';
+        if (score < 2) return 'Weak';
+        if (score < 3) return 'Fair';
+        if (score < 4) return 'Good';
+        return 'Strong';
+    };
+
+    const generatePassword = () => {
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+        let retVal = "";
+        for (let i = 0, n = charset.length; i < 16; ++i) {
+            retVal += charset.charAt(Math.floor(Math.random() * n));
+        }
+        setValue('password', retVal, { shouldValidate: true, shouldDirty: true });
+    };
+
     useEffect(() => {
         if (isModalOpen) {
             reset(formData);
@@ -43,6 +88,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
     const onSubmit = (data) => {
         handleSubmit(data);
     };
+
 
     return (
         <AnimatePresence>
@@ -185,11 +231,44 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                         <input
                                             type="text"
                                             {...register('password')}
-                                            className={`w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border ${errors.password ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all font-mono`}
+                                            onChange={(e) => {
+                                                register('password').onChange(e);
+                                                // Trigger re-render for strength calc if needed or handled by watch/state
+                                            }}
+                                            className={`w-full pl-11 pr-32 py-3 bg-gray-50 dark:bg-gray-800 border ${errors.password ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all font-mono`}
                                             placeholder="StrongPassword123!"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={generatePassword}
+                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-1"
+                                        >
+                                            Generate
+                                        </button>
                                     </div>
                                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+
+                                    {/* Password Strength Indicator */}
+                                    <div className="mt-3">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="text-gray-500 dark:text-gray-400 font-medium">Strength</span>
+                                            <span className={`font-bold ${getStrengthColor(passwordStrength)}`}>
+                                                {getStrengthLabel(passwordStrength)}
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex gap-0.5">
+                                            {[...Array(4)].map((_, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`h-full flex-1 transition-all duration-300 ${i < passwordStrength
+                                                        ? getStrengthColor(passwordStrength).replace('text-', 'bg-')
+                                                        : 'bg-transparent'
+                                                        }`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                                         <Lock size={12} /> Stored securely in your encrypted vault.
                                     </p>
