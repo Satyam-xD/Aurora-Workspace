@@ -120,32 +120,14 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
 
                     // If both have no messages, keep original order (or sort alphabetically)
                     if (!msgA && !msgB) return 0;
-                    if (!msgA) return 1;
-                    if (!msgB) return -1;
+                    if (!msgA) return 1; // b comes first
+                    if (!msgB) return -1; // a comes first
 
-                    // Sort by time descending (newest first)
-                    // Note: time is currently a string HH:MM, which is bad for sorting across days.
-                    // But for now it's better than nothing. Ideally use createdAt timestamp.
-                    // Assuming optimistic updates have Date.now() as ID, maybe use that?
-                    // Or rely on the fact that newer messages are added to the end of array?
-                    // Actually, we should look at the Real Date if available.
-                    // Since 'time' is formatted, we can't reliably sort by it if days differ.
-                    // But for single session, string compare of HH:MM might be okay-ish for same day, 
-                    // BUT 09:00 vs 10:00 works. 
-                    // 12:00 PM vs 01:00 PM? 
-                    // Let's use the 'id' if strictly numeric time based? No, ID is string from mongo.
-                    // Fallback to array index? 
-                    // Better: We should store 'lastUpdated' in chatsData objects.
-                    // For now, let's just attempt to put the one with the LATEST message at to top.
-                    // Since we can't parse the time effectively, let's skip sorting for now 
-                    // or just render as is? 
-                    // No, user asked for "everything". I'll defer complex sorting until I have raw timestamps.
-                    // Taking a simple approach: Just map.
-                    // Wait, I can try to use the message ID if it has a timestamp?
-                    // Let's just stick to the current order but user might expect reordering.
-                    // I will leave it as is to avoid breaking it with bad sort logic.
-                    // Actually, let's reverse the array? No.
-                    return 0;
+                    // Sort by time descending (newest first) using fullTime (ISO string)
+                    const timeA = new Date(msgA.fullTime || 0).getTime();
+                    const timeB = new Date(msgB.fullTime || 0).getTime();
+
+                    return timeB - timeA;
                 }).map((chatId, i) => {
                     const chatInfo = chatsData && chatsData[chatId];
                     const chatName = chatInfo?.name || "Unknown";
@@ -170,12 +152,17 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline">
-                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{chatName}</h3>
-                                        <span className="text-xs text-gray-500">{lastMsg?.time || ''}</span>
+                                        <h3 className={`text-sm ${chatInfo?.unread ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-100'} truncate`}>{chatName}</h3>
+                                        <span className={`text-xs ${chatInfo?.unread ? 'text-aurora-600 font-bold' : 'text-gray-500'}`}>{lastMsg?.time || ''}</span>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                        {lastMsg ? (lastMsg.isMe ? `You: ${lastMsg.text}` : lastMsg.text) : 'No messages'}
-                                    </p>
+                                    <div className="flex justify-between items-center">
+                                        <p className={`text-xs truncate ${chatInfo?.unread ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                            {lastMsg ? (lastMsg.isMe ? `You: ${lastMsg.text}` : lastMsg.text) : 'No messages'}
+                                        </p>
+                                        {chatInfo?.unread && (
+                                            <div className="w-2.5 h-2.5 bg-aurora-600 rounded-full ml-2"></div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

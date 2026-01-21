@@ -4,7 +4,7 @@ import { Send, Paperclip, Smile, Phone, Video, Info, X, CheckCheck } from 'lucid
 import Picker from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ChatWindow = ({ activeChat, messages, message, setMessage, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser }) => {
+const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser }) => {
     const [showEmoji, setShowEmoji] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const [infoSearchResults, setInfoSearchResults] = useState([]);
@@ -345,7 +345,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleSend, onl
 
                     <textarea
                         value={message}
-                        onChange={(e) => setMessage(e.target.value)}
+                        onChange={handleTyping}
                         placeholder="Type a message..."
                         rows={1}
                         className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 min-h-[44px] max-h-32"

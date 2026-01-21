@@ -45,7 +45,8 @@ const Chat = () => {
         activeChat={activeChat}
         messages={messages}
         message={message}
-        setMessage={handleTyping}
+        setMessage={setMessage}
+        handleTyping={handleTyping}
         handleSend={handleSend}
         onlineCount={activeOnlineCount}
         isTyping={isTyping}

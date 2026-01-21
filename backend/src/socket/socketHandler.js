@@ -1,9 +1,18 @@
-
 import Message from '../models/Message.js';
+import Conversation from '../models/Conversation.js';
 
 export const setupSocket = (io) => {
     io.on('connection', (socket) => {
         socket.emit("me", socket.id);
+
+        socket.on("setup", (userData) => {
+            const userId = userData?._id || userData?.id;
+            if (userId) {
+                socket.join(userId);
+                console.log(`User ${userId} joined their personal room`);
+                socket.emit("connected");
+            }
+        });
 
         socket.on("disconnect", () => {
             socket.broadcast.emit("callEnded");
@@ -31,15 +40,35 @@ export const setupSocket = (io) => {
         socket.on("sendMessage", async ({ room, text, senderId, type }) => {
             try {
                 const newMessage = await Message.create({
-                    room,
+                    chat: room,
                     text,
                     sender: senderId,
                     type: type || 'text'
                 });
 
-                const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name email');
+                const populatedMessage = await Message.findById(newMessage._id)
+                    .populate('sender', 'name email')
+                    .populate({
+                        path: 'chat',
+                        populate: {
+                            path: 'users',
+                            select: 'name email pic'
+                        }
+                    });
 
+                // Update latest message in conversation
+                await Conversation.findByIdAndUpdate(room, {
+                    latestMessage: newMessage
+                });
+
+                // Emit to the room (good for general updates)
                 io.to(room).emit("receiveMessage", populatedMessage);
+
+                // Also emit to each user's personal room to ensure "New Chat" notifications work
+                populatedMessage.chat.users.forEach(user => {
+                    if (user._id.toString() === senderId.toString()) return;
+                    io.to(user._id.toString()).emit("receiveMessage", populatedMessage);
+                });
             } catch (error) {
                 console.error("Socket Send Message Error:", error);
             }
