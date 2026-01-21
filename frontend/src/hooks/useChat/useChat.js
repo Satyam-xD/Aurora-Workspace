@@ -30,8 +30,6 @@ export const useChat = () => {
                     const newChatsData = {};
 
                     data.forEach(chat => {
-                        // Use chatName for groups, or find the other user's name for DMs
-                        // For now assuming chatName exists or we fallback
                         // Logic for DM name:
                         let displayName = chat.chatName;
                         if (!chat.isGroupChat && chat.users) {
@@ -40,8 +38,10 @@ export const useChat = () => {
                             displayName = otherUser?.name || "Unknown User";
                         }
 
-                        newChatsData[displayName || "Unnamed Chat"] = {
+                        // Key by ID now!
+                        newChatsData[chat._id] = {
                             id: chat._id,
+                            name: displayName, // Store name property
                             type: chat.isGroupChat ? 'group' : 'private',
                             onlineCount: chat.users?.length || 0,
                             messages: [] // Messages will be fetched when active
@@ -53,12 +53,7 @@ export const useChat = () => {
                     // Set first chat as active if none selected
                     if (!activeChat && data.length > 0) {
                         const firstChat = data[0];
-                        let firstName = firstChat.chatName;
-                        if (!firstChat.isGroupChat && firstChat.users) {
-                            const otherUser = firstChat.users.find(u => u._id !== user._id) || firstChat.users[0];
-                            firstName = otherUser?.name;
-                        }
-                        setActiveChat(firstName);
+                        setActiveChat(firstChat._id); // Set ID
                     }
                 }
             } catch (err) {
@@ -69,7 +64,7 @@ export const useChat = () => {
         if (user) {
             fetchUserChats();
         }
-    }, [user, activeChat]); // activeChat dependency might loop if not careful? No, only sets if !activeChat.
+    }, [user, activeChat]);
 
     const [isTyping, setIsTyping] = useState(false);
     const [typingTimer, setTypingTimer] = useState(null);
@@ -102,13 +97,21 @@ export const useChat = () => {
                 fullTime: newMessage.createdAt
             };
 
-            setChatsData(prev => ({
-                ...prev,
-                [newMessage.room]: {
-                    ...prev[newMessage.room],
-                    messages: [...(prev[newMessage.room]?.messages || []), formattedMsg]
-                }
-            }));
+            // newMessage.room is the Chat ID
+            setChatsData(prev => {
+                // If chat doesn't exist in local state (e.g. new chat started by someone else), 
+                // we might need to fetch it or ignore. 
+                // For now, only update if exists.
+                if (!prev[newMessage.room]) return prev;
+
+                return {
+                    ...prev,
+                    [newMessage.room]: {
+                        ...prev[newMessage.room],
+                        messages: [...(prev[newMessage.room]?.messages || []), formattedMsg]
+                    }
+                };
+            });
 
             // Play notification sound
             try {
@@ -128,7 +131,7 @@ export const useChat = () => {
     useEffect(() => {
         if (!activeChat || !user) return;
 
-        // Join Room
+        // Join Room (activeChat is ID now)
         socketRef.current.emit('joinRoom', { roomId: activeChat, name: user.name });
 
         // Fetch History
@@ -197,7 +200,7 @@ export const useChat = () => {
 
             // Emit to socket
             socketRef.current.emit('sendMessage', {
-                room: activeChat,
+                room: activeChat, // ID
                 text: msgContent,
                 senderId: user._id || user.id,
                 type: msgType
@@ -232,25 +235,9 @@ export const useChat = () => {
         }
     };
 
-    return {
-        message,
-        setMessage,
-        messages: activeMessages,
-        activeChat,
-        setActiveChat,
-        chats,
-        chatsData,
-        activeOnlineCount,
-        handleSend,
-        handleCreateGroup,
-        searchUsers,
-        handleAccessChat,
-        isTyping,
-        handleTyping,
-        handleFileUpload
-    };
 
-    const chats = Object.keys(chatsData);
+
+    const chats = Object.keys(chatsData); // Array of IDs
     const activeMessages = chatsData[activeChat]?.messages || [];
     const activeOnlineCount = chatsData[activeChat]?.onlineCount || 0;
 
@@ -276,14 +263,15 @@ export const useChat = () => {
             if (res.ok) {
                 setChatsData(prev => ({
                     ...prev,
-                    [data.chatName]: {
+                    [data._id]: { // Key by ID
                         id: data._id,
+                        name: data.chatName,
                         type: 'group',
                         onlineCount: 1,
                         messages: []
                     }
                 }));
-                setActiveChat(data.chatName);
+                setActiveChat(data._id);
             } else {
                 alert(data.message || "Failed to create group");
             }
@@ -332,18 +320,19 @@ export const useChat = () => {
                     displayName = otherUser?.name;
                 }
 
-                if (!chatsData[displayName]) {
+                if (!chatsData[data._id]) {
                     setChatsData(prev => ({
                         ...prev,
-                        [displayName]: {
+                        [data._id]: {
                             id: data._id,
+                            name: displayName,
                             type: 'private',
                             onlineCount: 2, // Assume online for now
                             messages: []
                         }
                     }));
                 }
-                setActiveChat(displayName);
+                setActiveChat(data._id);
             }
         } catch (err) {
             console.error("Failed to access chat", err);
@@ -385,16 +374,15 @@ export const useChat = () => {
             if (res.ok) {
                 // Update local state
                 setChatsData(prev => {
-                    const newState = { ...prev };
-                    // We need to find the key that holds this chat
-                    const oldKey = Object.keys(newState).find(key => newState[key].id === chatId);
-                    if (oldKey) {
-                        newState[chatName] = { ...newState[oldKey] };
-                        if (oldKey !== chatName) delete newState[oldKey];
-                    }
-                    return newState;
+                    if (!prev[chatId]) return prev;
+                    return {
+                        ...prev,
+                        [chatId]: {
+                            ...prev[chatId],
+                            name: chatName
+                        }
+                    };
                 });
-                setActiveChat(chatName);
             }
             return data;
         } catch (err) {

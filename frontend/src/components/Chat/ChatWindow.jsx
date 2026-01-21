@@ -77,16 +77,18 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleSend, onl
         );
     }
 
+    const activeChatName = chatsData[activeChat]?.name || 'Chat';
+
     return (
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 relative">
             {/* Chat Header */}
             <div className="h-16 px-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
                 <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white dark:ring-gray-800">
-                        {activeChat[0]}
+                        {activeChatName[0]}
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{activeChat}</h2>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{activeChatName}</h2>
                         <p className="text-xs text-green-500 flex items-center font-medium">
                             <span className="relative flex h-2 w-2 mr-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -197,9 +199,9 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleSend, onl
                             <div className="p-4 flex-1 overflow-y-auto">
                                 <div className="flex flex-col items-center mb-6">
                                     <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-3xl font-bold mb-3 shadow-md">
-                                        {activeChat[0]}
+                                        {activeChatName[0]}
                                     </div>
-                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">{activeChat}</h2>
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">{activeChatName}</h2>
                                     <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">
                                         {chatsData[activeChat]?.type === 'group' ? 'Group Chat' : 'Private Message'}
                                     </p>

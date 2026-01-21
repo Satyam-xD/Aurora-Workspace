@@ -146,15 +146,16 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
                     // I will leave it as is to avoid breaking it with bad sort logic.
                     // Actually, let's reverse the array? No.
                     return 0;
-                }).map((chat, i) => {
-                    const chatInfo = chatsData && chatsData[chat];
+                }).map((chatId, i) => {
+                    const chatInfo = chatsData && chatsData[chatId];
+                    const chatName = chatInfo?.name || "Unknown";
                     const lastMsg = chatInfo?.messages?.length > 0 ? chatInfo.messages[chatInfo.messages.length - 1] : null;
 
                     return (
                         <div
-                            key={i}
-                            onClick={() => setActiveChat(chat)}
-                            className={`p-4 cursor-pointer transition-all duration-200 border-l-4 ${activeChat === chat
+                            key={chatId}
+                            onClick={() => setActiveChat(chatId)}
+                            className={`p-4 cursor-pointer transition-all duration-200 border-l-4 ${activeChat === chatId
                                 ? 'bg-gradient-to-r from-aurora-50 to-white dark:from-aurora-900/20 dark:to-gray-800 border-aurora-600 shadow-sm'
                                 : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'
                                 }`}
@@ -165,11 +166,11 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
                                     'bg-gradient-to-br from-green-400 to-green-600',
                                     'bg-gradient-to-br from-orange-400 to-orange-600'][i % 4]
                                     }`}>
-                                    {chat[0]}
+                                    {chatName[0]}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline">
-                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{chat}</h3>
+                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{chatName}</h3>
                                         <span className="text-xs text-gray-500">{lastMsg?.time || ''}</span>
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">

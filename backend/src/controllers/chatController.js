@@ -7,7 +7,7 @@ import Message from '../models/Message.js';
 const getChatHistory = asyncHandler(async (req, res) => {
     const { room } = req.params;
 
-    const messages = await Message.find({ room })
+    const messages = await Message.find({ chat: room })
         .populate('sender', 'name email')
         .sort({ createdAt: 1 }) // Oldest first
         .limit(50); // Limit to last 50 for performance
