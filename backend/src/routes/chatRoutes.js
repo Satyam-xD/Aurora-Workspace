@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
-import { getChatHistory } from '../controllers/chatController.js';
+import { getChatHistory, sendMessage } from '../controllers/chatController.js';
 import {
     accessChat,
     fetchChats,
@@ -21,6 +21,7 @@ router.route('/groupadd').put(protect, addToGroup);
 router.route('/groupremove').put(protect, removeFromGroup);
 
 // Message Routes
+router.route('/message').post(protect, sendMessage); // New HTTP endpoint for sending messages
 router.route('/upload').post(protect, uploadAttachment);
 router.get('/:room', protect, getChatHistory);
 

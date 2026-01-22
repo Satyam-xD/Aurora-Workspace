@@ -1,8 +1,9 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useCallback, useEffect } from 'react';
 import { Search, Plus, MessageSquarePlus, Users } from 'lucide-react';
+import { debounce } from 'lodash';
 
-const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGroup, onSearchUsers, onAccessChat }) => {
+const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGroup, onSearchUsers, onAccessChat, isMobileMenuOpen, setIsMobileMenuOpen }) => {
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [groupName, setGroupName] = React.useState('');
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -17,15 +18,30 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
         }
     };
 
-    const handleSearch = async (e) => {
+    // Debounced search function
+    const debouncedSearch = useMemo(
+        () => debounce(async (query) => {
+            if (query.length > 0) {
+                const results = await onSearchUsers(query);
+                setSearchResults(results);
+            } else {
+                setSearchResults([]);
+            }
+        }, 300),
+        [onSearchUsers]
+    );
+
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
+
+    const handleSearch = (e) => {
         const query = e.target.value;
         setSearchQuery(query);
-        if (query.length > 0) {
-            const results = await onSearchUsers(query);
-            setSearchResults(results);
-        } else {
-            setSearchResults([]);
-        }
+        debouncedSearch(query);
     };
 
     const handleUserClick = (userId) => {
@@ -39,7 +55,8 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
     };
 
     return (
-        <div className="w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 hidden md:flex flex-col">
+        <div className={`w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 flex flex-col ${isMobileMenuOpen ? 'fixed inset-0 z-50 md:relative' : 'hidden md:flex'
+            }`}>
             <div className="p-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Messages</h2>

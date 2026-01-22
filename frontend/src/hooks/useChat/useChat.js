@@ -14,6 +14,14 @@ export const useChat = () => {
     // Dynamic chats data
     const [chatsData, setChatsData] = useState({});
 
+    // Caching and deduplication
+    const [fetchedChats, setFetchedChats] = useState(new Set());
+    const sentMessageIdsRef = useRef(new Set());
+
+    // Loading states
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [isUploadingFile, setIsUploadingFile] = useState(false);
+
     // Fetch User Chats on Mount
     useEffect(() => {
         const fetchUserChats = async () => {
@@ -87,7 +95,7 @@ export const useChat = () => {
         if (user) {
             fetchUserChats();
         }
-    }, [user, activeChat]);
+    }, [user]); // Removed activeChat to prevent infinite loop
 
     const [isTyping, setIsTyping] = useState(false);
     const [typingTimer, setTypingTimer] = useState(null);
@@ -100,12 +108,37 @@ export const useChat = () => {
 
     // 1. Connect to Socket
     useEffect(() => {
-        socketRef.current = io(SOCKET_URL);
+        socketRef.current = io(SOCKET_URL, {
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
 
         if (user) {
             socketRef.current.emit("setup", user);
         }
-        socketRef.current.on('connected', () => setSocketConnected(true));
+
+        socketRef.current.on('connected', () => {
+            console.log('Socket connected');
+            setSocketConnected(true);
+        });
+
+        socketRef.current.on('disconnect', () => {
+            console.log('Socket disconnected');
+            setSocketConnected(false);
+        });
+
+        socketRef.current.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected after', attemptNumber, 'attempts');
+            setSocketConnected(true);
+
+            // Rejoin all rooms after reconnection
+            if (user) {
+                Object.values(chatsData).forEach(chat => {
+                    socketRef.current.emit('joinRoom', { roomId: chat.id, name: user.name });
+                });
+            }
+        });
 
         socketRef.current.on('typing', (room) => {
             if (activeChatRef.current === room) setIsTyping(true);
@@ -116,8 +149,21 @@ export const useChat = () => {
 
         // Listen for incoming messages
         socketRef.current.on('receiveMessage', (newMessage) => {
-            // Ignore own messages to prevent duplicates (since we do optimistic updates)
-            if (newMessage.sender._id === user?._id || newMessage.sender === user?._id) return;
+            console.log('Received message:', newMessage);
+
+            // Deduplication check
+            if (sentMessageIdsRef.current.has(newMessage._id)) {
+                console.log('Duplicate message, ignoring');
+                return;
+            }
+
+            // Handle own messages - add to dedup set but don't display (we have optimistic update)
+            const isOwnMessage = newMessage.sender._id === user?._id || newMessage.sender === user?._id;
+            if (isOwnMessage) {
+                console.log('Own message received, adding to dedup set');
+                sentMessageIdsRef.current.add(newMessage._id);
+                return; // Still return to avoid duplicate display
+            }
 
             // Format message to match UI structure
             const formattedMsg = {
@@ -189,10 +235,21 @@ export const useChat = () => {
         });
 
         return () => {
-            socketRef.current.disconnect();
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
             setSocketConnected(false);
         };
     }, [user]);
+
+    // Cleanup typing timer on unmount
+    useEffect(() => {
+        return () => {
+            if (typingTimer) {
+                clearTimeout(typingTimer);
+            }
+        };
+    }, [typingTimer]);
 
     // New Effect to Join Rooms when Socket is Ready AND Chats are loaded
     useEffect(() => {
@@ -203,15 +260,53 @@ export const useChat = () => {
         }
     }, [chatsData, socketConnected, user]);
 
-    // 2. Join Room & Fetch History on Chat Switch
+    // 2. Join Room & Fetch History on Chat Switch (with caching)
     useEffect(() => {
         if (!activeChat || !user) return;
 
-        // Join Room (activeChat is ID now)
-        socketRef.current.emit('joinRoom', { roomId: activeChat, name: user.name });
+        console.log('\ud83d\udeaa Attempting to join room:', activeChat);
+        console.log('Socket connected:', socketConnected);
+        console.log('Socket ref exists:', !!socketRef.current);
+
+
+        // Join Room only if socket is connected
+        if (socketRef.current && socketConnected) {
+            console.log('\u2705 Joining room:', activeChat, 'as', user.name);
+            socketRef.current.emit('joinRoom', { roomId: activeChat, name: user.name });
+        } else if (socketRef.current) {
+            console.log('\u26a0\ufe0f Socket not ready, will join when connected');
+
+            const handleConnected = () => {
+                console.log('\ud83d\udd04 Socket connected! Joining room:', activeChat);
+                socketRef.current.emit('joinRoom', { roomId: activeChat, name: user.name });
+            };
+
+            socketRef.current.once('connected', handleConnected);
+
+            return () => {
+                if (socketRef.current) {
+                    socketRef.current.off('connected', handleConnected);
+                }
+            };
+        }
+
+
+        // Only fetch if not already cached
+        if (fetchedChats.has(activeChat)) {
+            // Mark as read
+            setChatsData(prev => ({
+                ...prev,
+                [activeChat]: {
+                    ...prev[activeChat],
+                    unread: false
+                }
+            }));
+            return;
+        }
 
         // Fetch History
         const fetchHistory = async () => {
+            setIsLoadingHistory(true);
             try {
                 const token = user.token || JSON.parse(localStorage.getItem('user'))?.token;
                 if (!token) return;
@@ -221,10 +316,13 @@ export const useChat = () => {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                const data = await res.json();
+                const responseData = await res.json();
 
                 if (res.ok) {
-                    const formattedMessages = data.map(msg => ({
+                    // Handle both old and new API response formats
+                    const messagesArray = responseData.messages || responseData;
+
+                    const formattedMessages = messagesArray.map(msg => ({
                         id: msg._id,
                         text: msg.text,
                         sender: msg.sender.name,
@@ -243,17 +341,83 @@ export const useChat = () => {
                             unread: false
                         }
                     }));
+
+                    // Mark as fetched
+                    setFetchedChats(prev => new Set([...prev, activeChat]));
                 }
             } catch (err) {
                 console.error("Failed to fetch chat history", err);
+            } finally {
+                setIsLoadingHistory(false);
             }
         };
 
         fetchHistory();
 
-    }, [activeChat, user]);
+    }, [activeChat, user, fetchedChats, socketConnected]);
 
-    const handleSend = (msgType = 'text', msgContent = message) => {
+    // Polling effect - fetch new messages every 3 seconds for async messaging
+    useEffect(() => {
+        if (!activeChat || !user) return;
+
+        const pollMessages = async () => {
+            try {
+                const token = user.token || JSON.parse(localStorage.getItem('user'))?.token;
+                if (!token) return;
+
+                const res = await fetch(`/api/chat/${encodeURIComponent(activeChat)}?limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const responseData = await res.json();
+
+                if (res.ok) {
+                    const messagesArray = responseData.messages || responseData;
+
+                    setChatsData(prev => {
+                        // Only update if we have new messages
+                        const currentMessages = prev[activeChat]?.messages || [];
+                        const latestCurrentId = currentMessages[currentMessages.length - 1]?.id;
+                        const latestFetchedId = messagesArray[messagesArray.length - 1]?._id;
+
+                        if (latestCurrentId !== latestFetchedId) {
+                            const formattedMessages = messagesArray.map(msg => ({
+                                id: msg._id,
+                                text: msg.text,
+                                sender: msg.sender.name,
+                                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                isMe: msg.sender._id === user._id,
+                                senderAvatar: msg.sender.name ? msg.sender.name[0] : 'U',
+                                type: msg.type || 'text',
+                                fullTime: msg.createdAt
+                            }));
+
+                            return {
+                                ...prev,
+                                [activeChat]: {
+                                    ...prev[activeChat],
+                                    messages: formattedMessages,
+                                    unread: false
+                                }
+                            };
+                        }
+                        return prev;
+                    });
+                }
+            } catch (err) {
+                console.error("Polling error:", err);
+            }
+        };
+
+        // Poll every 3 seconds
+        const intervalId = setInterval(pollMessages, 3000);
+
+        // Cleanup
+        return () => clearInterval(intervalId);
+    }, [activeChat, user]); // Removed chatsData from dependencies
+
+    const handleSend = async (msgType = 'text', msgContent = message) => {
         if ((msgContent.trim() || msgType === 'image') && user) {
             // Optimistic Update
             const tempMsg = {
@@ -275,13 +439,68 @@ export const useChat = () => {
                 }
             }));
 
-            // Emit to socket
-            socketRef.current.emit('sendMessage', {
-                room: activeChat, // ID
-                text: msgContent,
-                senderId: user._id || user.id,
-                type: msgType
-            });
+            // Send via HTTP API to persist in database
+            try {
+                const token = user.token || JSON.parse(localStorage.getItem('user'))?.token;
+
+                const res = await fetch('/api/chat/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        chatId: activeChat,
+                        text: msgContent,
+                        type: msgType
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error('Failed to send message');
+                }
+
+                const savedMessage = await res.json();
+                console.log('✅ Message saved to database:', savedMessage);
+
+                // Update with real message from server
+                setChatsData(prev => ({
+                    ...prev,
+                    [activeChat]: {
+                        ...prev[activeChat],
+                        messages: prev[activeChat].messages.map(msg =>
+                            msg.id === tempMsg.id ? {
+                                ...msg,
+                                id: savedMessage._id,
+                                fullTime: savedMessage.createdAt
+                            } : msg
+                        )
+                    }
+                }));
+
+                // Also emit to socket for real-time updates (if connected)
+                if (socketRef.current && socketConnected) {
+                    socketRef.current.emit('sendMessage', {
+                        room: activeChat,
+                        text: msgContent,
+                        senderId: user._id || user.id,
+                        type: msgType
+                    });
+                }
+
+            } catch (err) {
+                console.error('Failed to send message:', err);
+                alert('Failed to send message. Please try again.');
+
+                // Remove optimistic message on error
+                setChatsData(prev => ({
+                    ...prev,
+                    [activeChat]: {
+                        ...prev[activeChat],
+                        messages: prev[activeChat].messages.filter(msg => msg.id !== tempMsg.id)
+                    }
+                }));
+            }
 
             if (msgType === 'text') {
                 setMessage('');
@@ -290,6 +509,29 @@ export const useChat = () => {
     };
 
     const handleFileUpload = async (file) => {
+        // File validation
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const ALLOWED_FILE_TYPES = [...ALLOWED_IMAGE_TYPES, 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+        if (!file) {
+            console.error('No file selected');
+            return;
+        }
+
+        // Check file size
+        if (file.size > MAX_FILE_SIZE) {
+            alert(`File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
+            return;
+        }
+
+        // Check file type
+        if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+            alert('Invalid file type. Allowed: Images, PDF, Word documents, and text files');
+            return;
+        }
+
+        setIsUploadingFile(true);
         try {
             const formData = new FormData();
             formData.append('file', file);
@@ -302,13 +544,24 @@ export const useChat = () => {
                 },
                 body: formData
             });
+
+            if (!res.ok) {
+                throw new Error(`Upload failed: ${res.statusText}`);
+            }
+
             const data = await res.json();
 
-            if (res.ok) {
-                handleSend('image', data.url);
+            if (res.ok && data.url) {
+                const fileType = ALLOWED_IMAGE_TYPES.includes(file.type) ? 'image' : 'file';
+                handleSend(fileType, data.url);
+            } else {
+                throw new Error(data.message || 'Upload failed');
             }
         } catch (err) {
             console.error("Upload failed", err);
+            alert(`Upload failed: ${err.message}`);
+        } finally {
+            setIsUploadingFile(false);
         }
     };
 
@@ -565,6 +818,8 @@ export const useChat = () => {
         renameGroup,
         addToGroup,
         removeFromGroup,
-        user // Expose user for ID checks
+        user, // Expose user for ID checks
+        isLoadingHistory,
+        isUploadingFile
     };
 };

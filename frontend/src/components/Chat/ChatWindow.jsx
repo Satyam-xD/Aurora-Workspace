@@ -1,10 +1,11 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Send, Paperclip, Smile, Phone, Video, Info, X, CheckCheck } from 'lucide-react';
 import Picker from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 
-const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser }) => {
+const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser, isLoadingHistory, isUploadingFile }) => {
     const [showEmoji, setShowEmoji] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const [infoSearchResults, setInfoSearchResults] = useState([]);
@@ -65,6 +66,9 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
         return groups;
     };
 
+    // Memoize grouped messages to prevent recalculation on every render
+    const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages]);
+
     if (!activeChat) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-500">
@@ -99,11 +103,23 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     </div>
                 </div>
                 <div className="flex items-center space-x-1 text-gray-500 dark:text-gray-400">
-                    <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Phone size={18} /></button>
-                    <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><Video size={18} /></button>
+                    <button
+                        className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                        aria-label="Start voice call"
+                    >
+                        <Phone size={18} />
+                    </button>
+                    <button
+                        className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                        aria-label="Start video call"
+                    >
+                        <Video size={18} />
+                    </button>
                     <button
                         onClick={() => setShowInfo(!showInfo)}
                         className={`p-2.5 rounded-full transition-colors ${showInfo ? 'bg-aurora-100 dark:bg-aurora-900/30 text-aurora-600' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400'}`}
+                        aria-label={showInfo ? 'Hide chat info' : 'Show chat info'}
+                        aria-expanded={showInfo}
                     >
                         <Info size={18} />
                     </button>
@@ -116,12 +132,21 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 scroll-smooth">
                     {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
-                            <Smile size={48} className="mb-2" />
-                            <p>No messages yet. Say hello!</p>
+                            {isLoadingHistory ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-aurora-500 mb-2"></div>
+                                    <p>Loading messages...</p>
+                                </>
+                            ) : (
+                                <>
+                                    <Smile size={48} className="mb-2" />
+                                    <p>No messages yet. Say hello!</p>
+                                </>
+                            )}
                         </div>
                     )}
 
-                    {Object.entries(groupMessagesByDate(messages)).map(([dateLabel, msgs]) => (
+                    {Object.entries(groupedMessages).map(([dateLabel, msgs]) => (
                         <div key={dateLabel} className="space-y-6">
                             <div className="flex justify-center sticky top-0 z-10">
                                 <span className="bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs py-1 px-3 rounded-full shadow-sm">
@@ -161,12 +186,22 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                                                         <Paperclip size={16} />
                                                     </div>
                                                     <div className="overflow-hidden">
-                                                        <p className="text-xs font-semibold truncate text-gray-700 dark:text-gray-200">{msg.text.split('/').pop().slice(14)}</p>
+                                                        <p className="text-xs font-semibold truncate text-gray-700 dark:text-gray-200">
+                                                            {DOMPurify.sanitize(msg.text.split('/').pop().slice(14), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })}
+                                                        </p>
                                                         <p className="text-[10px] text-gray-500">Click to open</p>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <p className="leading-relaxed px-3 py-1">{msg.text}</p>
+                                                <p
+                                                    className="leading-relaxed px-3 py-1"
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: DOMPurify.sanitize(msg.text, {
+                                                            ALLOWED_TAGS: [],
+                                                            ALLOWED_ATTR: []
+                                                        })
+                                                    }}
+                                                />
                                             )}
                                             <div className={`flex items-center justify-end space-x-1 mt-1 ${msg.isMe ? 'text-blue-100' : 'text-gray-400'}`}>
                                                 <span className="text-[10px] opacity-80">{msg.time}</span>
@@ -188,7 +223,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                             initial={{ x: 300, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: 300, opacity: 0 }}
-                            className="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-xl z-30 absolute right-0 top-0 bottom-0"
+                            className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-xl z-30 absolute right-0 top-0 bottom-0"
                         >
                             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
                                 <h3 className="font-semibold text-gray-900 dark:text-white">Chat Info</h3>
@@ -338,9 +373,18 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     />
                     <button
                         onClick={handleFileClick}
-                        className="p-3 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400 rounded-full transition-colors"
+                        disabled={isUploadingFile}
+                        className={`p-3 rounded-full transition-colors ${isUploadingFile
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400'
+                            }`}
+                        title={isUploadingFile ? 'Uploading...' : 'Attach file'}
                     >
-                        <Paperclip size={20} />
+                        {isUploadingFile ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div>
+                        ) : (
+                            <Paperclip size={20} />
+                        )}
                     </button>
 
                     <textarea
@@ -360,6 +404,8 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     <button
                         onClick={() => setShowEmoji(!showEmoji)}
                         className={`p-3 rounded-full transition-colors ${showEmoji ? 'text-aurora-600 bg-aurora-50 dark:bg-aurora-900/20' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400'}`}
+                        aria-label={showEmoji ? 'Close emoji picker' : 'Open emoji picker'}
+                        aria-expanded={showEmoji}
                     >
                         <Smile size={20} />
                     </button>
@@ -371,6 +417,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                             ? 'bg-gradient-to-r from-aurora-600 to-indigo-600 text-white hover:shadow-lg transform hover:scale-105 active:scale-95'
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                             }`}
+                        aria-label="Send message"
                     >
                         <Send size={20} className={message.trim() ? "ml-0.5" : ""} />
                     </button>
