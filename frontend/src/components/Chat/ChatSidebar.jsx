@@ -154,9 +154,9 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
                         <div
                             key={chatId}
                             onClick={() => setActiveChat(chatId)}
-                            className={`p-4 cursor-pointer transition-all duration-200 border-l-4 ${activeChat === chatId
-                                ? 'bg-gradient-to-r from-aurora-50 to-white dark:from-aurora-900/20 dark:to-gray-800 border-aurora-600 shadow-sm'
-                                : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                            className={`p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all duration-200 group relative ${activeChat === chatId
+                                ? 'bg-aurora-600 text-white shadow-lg shadow-aurora-500/20 ring-2 ring-aurora-600 ring-offset-2 ring-offset-white dark:ring-offset-gray-800'
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-900 dark:text-gray-100'
                                 }`}
                         >
                             <div className="flex items-center space-x-3">
@@ -169,15 +169,23 @@ const ChatSidebar = ({ chats, activeChat, setActiveChat, chatsData, onCreateGrou
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline">
-                                        <h3 className={`text-sm ${chatInfo?.unread ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-100'} truncate`}>{chatName}</h3>
-                                        <span className={`text-xs ${chatInfo?.unread ? 'text-aurora-600 font-bold' : 'text-gray-500'}`}>{lastMsg?.time || ''}</span>
+                                        <h3 className={`text-sm font-semibold truncate ${activeChat === chatId ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+                                            {chatName}
+                                        </h3>
+                                        <span className={`text-xs ${activeChat === chatId ? 'text-white/80' : 'text-gray-500'} ${chatInfo?.unread && activeChat !== chatId ? 'text-aurora-600 font-bold' : ''}`}>
+                                            {lastMsg?.time || ''}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <p className={`text-xs truncate ${chatInfo?.unread ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        <p className={`text-xs truncate ${activeChat === chatId ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'} ${chatInfo?.unread && activeChat !== chatId ? 'font-bold text-gray-900 dark:text-white' : ''}`}>
                                             {lastMsg ? (lastMsg.isMe ? `You: ${lastMsg.text}` : lastMsg.text) : 'No messages'}
                                         </p>
-                                        {chatInfo?.unread && (
-                                            <div className="w-2.5 h-2.5 bg-aurora-600 rounded-full ml-2"></div>
+                                        {chatInfo?.unread && activeChat !== chatId && (
+                                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 rounded-full ml-2 shadow-sm ring-1 ring-white dark:ring-gray-900">
+                                                <span className="text-[10px] font-bold text-white leading-none">
+                                                    {chatInfo.unreadCount > 9 ? '9+' : chatInfo.unreadCount}
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
                                 </div>

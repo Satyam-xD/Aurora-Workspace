@@ -1,7 +1,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Paperclip, Smile, Phone, Video, Info, X, CheckCheck } from 'lucide-react';
+import { Send, Paperclip, Smile, Phone, Video, Info, X, CheckCheck, Plus } from 'lucide-react';
 import Picker from 'emoji-picker-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 
@@ -9,6 +11,8 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
     const [showEmoji, setShowEmoji] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const [infoSearchResults, setInfoSearchResults] = useState([]);
+    const [showLeaveModal, setShowLeaveModal] = useState(false);
+    const navigate = useNavigate();
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -35,6 +39,12 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
         }
         // Reset input
         e.target.value = '';
+    };
+
+    const startVideoCall = () => {
+        // Create a unique room name based on chat ID
+        const roomName = `aurora-${activeChat.substring(0, 8)}`;
+        navigate(`/video-call?room=${roomName}`);
     };
 
     // Helper to format date groups
@@ -93,23 +103,31 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     </div>
                     <div>
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{activeChatName}</h2>
-                        <p className="text-xs text-green-500 flex items-center font-medium">
-                            <span className="relative flex h-2 w-2 mr-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                            </span>
-                            {onlineCount || 1} online
-                        </p>
+                        {chatsData[activeChat]?.type === 'group' && chatsData[activeChat]?.users?.length > 0 ? (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate max-w-[200px] sm:max-w-md">
+                                {chatsData[activeChat].users.map(u => u.name).join(', ')}
+                            </p>
+                        ) : (
+                            <p className="text-xs text-green-500 flex items-center font-medium">
+                                <span className="relative flex h-2 w-2 mr-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                {onlineCount || 1} online
+                            </p>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center space-x-1 text-gray-500 dark:text-gray-400">
                     <button
+                        onClick={() => toast.info('Voice calling coming soon!')}
                         className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                         aria-label="Start voice call"
                     >
                         <Phone size={18} />
                     </button>
                     <button
+                        onClick={startVideoCall}
                         className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                         aria-label="Start video call"
                     >
@@ -129,7 +147,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
 
             <div className="flex flex-1 overflow-hidden relative">
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 scroll-smooth">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 space-y-6 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 scroll-smooth">
                     {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
                             {isLoadingHistory ? (
@@ -167,9 +185,9 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                                             </div>
                                         )}
 
-                                        <div className={`relative px-2 py-2 rounded-2xl text-sm shadow-sm transition-all ${msg.isMe
-                                            ? 'bg-gradient-to-r from-aurora-600 to-indigo-600 text-white rounded-br-sm'
-                                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-bl-sm'
+                                        <div className={`relative px-4 py-2.5 shadow-sm transition-all ${msg.isMe
+                                            ? 'bg-gradient-to-br from-aurora-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm'
+                                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-100 dark:border-gray-700/50 rounded-2xl rounded-tl-sm shadow-sm'
                                             }`}>
                                             {msg.type === 'image' ? (
                                                 <div className="mb-1">
@@ -223,7 +241,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                             initial={{ x: 300, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: 300, opacity: 0 }}
-                            className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-xl z-30 absolute right-0 top-0 bottom-0"
+                            className="w-full md:w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-xl z-50 absolute right-0 top-0 bottom-0"
                         >
                             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
                                 <h3 className="font-semibold text-gray-900 dark:text-white">Chat Info</h3>
@@ -263,7 +281,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
 
                                         <div className="mb-6">
                                             <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3 flex justify-between items-center">
-                                                Members ({onlineCount})
+                                                Members ({chatsData[activeChat]?.users?.length || onlineCount})
                                             </h4>
 
                                             {/* Add Member Search */}
@@ -275,8 +293,6 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                                                         const query = e.target.value;
                                                         if (query.length > 0) {
                                                             const res = await searchUsers(query);
-                                                            // Simplified rendering: just logging or setting state? 
-                                                            // For now we need a state for search results IN this component
                                                             setInfoSearchResults(res);
                                                         } else {
                                                             setInfoSearchResults([]);
@@ -288,37 +304,66 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                                                         {infoSearchResults.map(u => (
                                                             <div
                                                                 key={u._id}
-                                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm dark:text-white"
+                                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm dark:text-white flex items-center justify-between"
                                                                 onClick={() => {
                                                                     addToGroup(chatsData[activeChat].id, u._id);
                                                                     setInfoSearchResults([]);
                                                                 }}
                                                             >
-                                                                {u.name}
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded-full bg-aurora-100 text-aurora-600 flex items-center justify-center text-xs font-bold">
+                                                                        {u.name[0]}
+                                                                    </div>
+                                                                    <span>{u.name}</span>
+                                                                </div>
+                                                                <Plus size={14} className="text-gray-400" />
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
                                             </div>
 
-                                            {/* Member List (Mocked/Inferred from onlineCount since we don't have full member list in chatsData yet - wait, we DO need full member list) */
-                                            /* Issue: chatsData only has onlineCount. We need to fetch details. 
-                                               But for MVP+, lets just show "You" and "Others". 
-                                               Actually, the user wants "Everything". 
-                                               We should fetch group config if not available.
-                                               Let's assume for now we only show count and the "Add" feature works.
-                                               To properly list members, we need to populate them in useChat.
-                                            */}
+                                            {/* Member List */}
+                                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                {chatsData[activeChat]?.users?.map(member => (
+                                                    <div key={member._id} className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                                                                {member.name[0]}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                                                    {member.name}
+                                                                    {chatsData[activeChat].groupAdmin?._id === member._id && (
+                                                                        <span className="text-[10px] bg-aurora-100 text-aurora-700 px-1.5 py-0.5 rounded border border-aurora-200 font-bold">Admin</span>
+                                                                    )}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 truncate max-w-[120px]">{member.email}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Admin Actions: Remove User (only if I am admin, and not removing myself here - use Leave for myself) */}
+                                                        {chatsData[activeChat].groupAdmin?._id === currentUser._id && member._id !== currentUser._id && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm(`Remove ${member.name} from group?`)) {
+                                                                        removeFromGroup(chatsData[activeChat].id, member._id);
+                                                                    }
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+                                                                title="Remove user"
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
 
                                         <button
                                             className="w-full py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium"
-                                            onClick={() => {
-                                                if (window.confirm("Are you sure you want to leave this group?")) {
-                                                    removeFromGroup(chatsData[activeChat].id, currentUser._id);
-                                                    setShowInfo(false);
-                                                }
-                                            }}
+                                            onClick={() => setShowLeaveModal(true)}
                                         >
                                             Leave Group
                                         </button>
@@ -328,20 +373,69 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* Leave Group Modal */}
+                <AnimatePresence>
+                    {showLeaveModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                                onClick={() => setShowLeaveModal(false)}
+                            />
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl w-full max-w-sm relative z-10"
+                            >
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Leave Group?</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+                                    Are you sure you want to leave this group? You won't receive new messages.
+                                </p>
+                                <div className="flex gap-3 justify-end">
+                                    <button
+                                        onClick={() => setShowLeaveModal(false)}
+                                        className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            removeFromGroup(chatsData[activeChat].id, currentUser._id);
+                                            setShowLeaveModal(false);
+                                            setShowInfo(false);
+                                        }}
+                                        className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Leave
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
 
 
             {/* Input Area */}
-            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 relative z-30">
+            <div className={`absolute bottom-6 left-0 px-4 z-30 transition-all duration-300 ease-in-out ${showInfo ? 'right-0 md:right-80' : 'right-0'}`}>
                 <AnimatePresence>
                     {isTyping && (
                         <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute -top-8 left-4 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full shadow-sm border border-gray-200 dark:border-gray-700"
+                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="absolute -top-10 left-8 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg border border-gray-200/50 dark:border-gray-700/50 flex items-center gap-2"
                         >
-                            <span className="text-xs text-gray-500 animate-pulse">Typing...</span>
+                            <div className="flex space-x-1">
+                                <div className="w-1.5 h-1.5 bg-aurora-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                                <div className="w-1.5 h-1.5 bg-aurora-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                                <div className="w-1.5 h-1.5 bg-aurora-500 rounded-full animate-bounce"></div>
+                            </div>
+                            <span className="text-xs text-gray-500 font-medium">Someone is typing...</span>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -349,22 +443,22 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                 <AnimatePresence>
                     {showEmoji && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            className="absolute bottom-20 right-4 z-40 shadow-2xl rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="absolute bottom-20 right-4 z-40 shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700"
                         >
                             <Picker
                                 onEmojiClick={onEmojiClick}
                                 theme="auto"
-                                width={300}
-                                height={350}
+                                width={320}
+                                height={400}
                             />
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                <div className="max-w-4xl mx-auto flex items-end space-x-2 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-3xl border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-aurora-500/30 focus-within:border-aurora-500 transition-all shadow-sm">
+                <div className="max-w-4xl mx-auto flex items-end space-x-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl p-2 rounded-[2rem] border border-white/20 dark:border-gray-700/30 shadow-2xl ring-1 ring-black/5 dark:ring-white/5">
                     <input
                         type="file"
                         ref={fileInputRef}
@@ -374,14 +468,14 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     <button
                         onClick={handleFileClick}
                         disabled={isUploadingFile}
-                        className={`p-3 rounded-full transition-colors ${isUploadingFile
-                            ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400'
+                        className={`p-3 rounded-full transition-all duration-200 ${isUploadingFile
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-aurora-600 dark:hover:text-aurora-400'
                             }`}
                         title={isUploadingFile ? 'Uploading...' : 'Attach file'}
                     >
                         {isUploadingFile ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
                         ) : (
                             <Paperclip size={20} />
                         )}
@@ -392,7 +486,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                         onChange={handleTyping}
                         placeholder="Type a message..."
                         rows={1}
-                        className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 min-h-[44px] max-h-32"
+                        className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-3 px-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 min-h-[44px] max-h-32 scrollbar-hide"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -403,9 +497,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
 
                     <button
                         onClick={() => setShowEmoji(!showEmoji)}
-                        className={`p-3 rounded-full transition-colors ${showEmoji ? 'text-aurora-600 bg-aurora-50 dark:bg-aurora-900/20' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-gray-400'}`}
-                        aria-label={showEmoji ? 'Close emoji picker' : 'Open emoji picker'}
-                        aria-expanded={showEmoji}
+                        className={`p-3 rounded-full transition-all duration-200 ${showEmoji ? 'text-aurora-600 bg-aurora-50 dark:bg-aurora-900/20' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400 hover:text-aurora-600'}`}
                     >
                         <Smile size={20} />
                     </button>
@@ -413,11 +505,10 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                     <button
                         onClick={handleSend}
                         disabled={!message.trim()}
-                        className={`p-3 rounded-full transition-all duration-300 shadow-md flex items-center justify-center ${message.trim()
-                            ? 'bg-gradient-to-r from-aurora-600 to-indigo-600 text-white hover:shadow-lg transform hover:scale-105 active:scale-95'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                        className={`p-3 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center ${message.trim()
+                            ? 'bg-gradient-to-r from-aurora-600 to-indigo-600 text-white hover:shadow-xl hover:shadow-aurora-500/30 transform hover:scale-110 active:scale-95'
+                            : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                             }`}
-                        aria-label="Send message"
                     >
                         <Send size={20} className={message.trim() ? "ml-0.5" : ""} />
                     </button>

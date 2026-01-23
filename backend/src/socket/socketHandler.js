@@ -2,6 +2,9 @@ import Message from '../models/Message.js';
 import Conversation from '../models/Conversation.js';
 
 export const setupSocket = (io) => {
+    // Track online users: userId -> socketId
+    let onlineUsers = new Map();
+
     io.on('connection', (socket) => {
         socket.emit("me", socket.id);
 
@@ -9,12 +12,30 @@ export const setupSocket = (io) => {
             const userId = userData?._id || userData?.id;
             if (userId) {
                 socket.join(userId);
+                onlineUsers.set(userId, socket.id);
                 console.log(`User ${userId} joined their personal room`);
+
+                // Broadcast online users list to everyone
+                io.emit("onlineUsers", Array.from(onlineUsers.keys()));
                 socket.emit("connected");
             }
         });
 
         socket.on("disconnect", () => {
+            // Find key by value to remove
+            let disconnectedUserId;
+            for (let [userId, socketId] of onlineUsers.entries()) {
+                if (socketId === socket.id) {
+                    disconnectedUserId = userId;
+                    break;
+                }
+            }
+
+            if (disconnectedUserId) {
+                onlineUsers.delete(disconnectedUserId);
+                io.emit("onlineUsers", Array.from(onlineUsers.keys()));
+            }
+
             socket.broadcast.emit("callEnded");
         });
 

@@ -1,10 +1,36 @@
-
 import { useState, useMemo } from 'react';
+import { useChatContext } from '../../context/ChatContext';
 import { MessageCircle, Video, FileText, UserPlus, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const useNotifications = () => {
     const [filter, setFilter] = useState('all');
-    const [notifications, setNotifications] = useState([
+    const { chatsData, setActiveChat } = useChatContext();
+    const navigate = useNavigate();
+
+    // Generate notifications from unread chats
+    const chatNotifications = useMemo(() => {
+        if (!chatsData) return [];
+        return Object.values(chatsData)
+            .filter(chat => chat.unreadCount > 0)
+            .map(chat => {
+                const lastMsg = chat.messages[chat.messages.length - 1];
+                return {
+                    id: `chat-${chat.id}`,
+                    chatId: chat.id,
+                    type: 'message',
+                    title: `New message from ${chat.name}`,
+                    description: lastMsg ? lastMsg.text : 'You have a new message',
+                    time: lastMsg ? new Date(lastMsg.fullTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+                    read: false,
+                    icon: MessageCircle,
+                    color: 'bg-blue-500',
+                    link: `/chat`
+                };
+            });
+    }, [chatsData]);
+
+    const [mockNotifications, setMockNotifications] = useState([
         {
             id: 1,
             type: 'message',
@@ -57,18 +83,33 @@ export const useNotifications = () => {
         }
     ]);
 
+    // Combine mock and real chat notifications
+    const notifications = useMemo(() => {
+        return [...chatNotifications, ...mockNotifications];
+    }, [chatNotifications, mockNotifications]);
+
     const markAsRead = (id) => {
-        setNotifications(notifications.map(notif =>
+        if (typeof id === 'string' && id.startsWith('chat-')) {
+            const chatId = id.replace('chat-', '');
+            setActiveChat(chatId);
+            navigate('/chat');
+            return;
+        }
+        setMockNotifications(mockNotifications.map(notif =>
             notif.id === id ? { ...notif, read: true } : notif
         ));
     };
 
     const markAllAsRead = () => {
-        setNotifications(notifications.map(notif => ({ ...notif, read: true })));
+        setMockNotifications(mockNotifications.map(notif => ({ ...notif, read: true })));
     };
 
     const deleteNotification = (id) => {
-        setNotifications(notifications.filter(notif => notif.id !== id));
+        if (typeof id === 'string' && id.startsWith('chat-')) {
+            // Cannot delete chat notification easily, maybe just ignore
+            return;
+        }
+        setMockNotifications(mockNotifications.filter(notif => notif.id !== id));
     };
 
     const filteredNotifications = useMemo(() => {

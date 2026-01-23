@@ -21,6 +21,7 @@ const Pricing = React.lazy(() => import('./pages/Pricing'));
 const About = React.lazy(() => import('./pages/About'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 import './index.css';
+import { ChatProvider } from './context/ChatContext';
 
 // Public route wrapper (redirects to home if already logged in)
 const PublicRoute = ({ children }) => {
@@ -182,13 +183,16 @@ function AppRoutes() {
   );
 }
 
+
 function App() {
   return (
     <ThemeProvider>
       <Router>
         <AuthProvider>
-          <Toaster position="top-center" richColors />
-          <AppRoutes />
+          <ChatProvider>
+            <Toaster position="top-center" richColors />
+            <AppRoutes />
+          </ChatProvider>
         </AuthProvider>
       </Router>
     </ThemeProvider>
