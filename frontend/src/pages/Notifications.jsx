@@ -3,7 +3,8 @@ import React from 'react';
 import { useNotifications } from '../hooks/useNotifications/useNotifications';
 import NotificationFilters from '../components/Notifications/NotificationFilters';
 import NotificationItem from '../components/Notifications/NotificationItem';
-import { Bell, Filter } from 'lucide-react';
+import { Bell, Filter, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Notifications = () => {
   const {
@@ -17,52 +18,87 @@ const Notifications = () => {
   } = useNotifications();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 animate-fade-in">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950/30 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-[100px] animate-blob" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[600px] h-[600px] bg-gradient-to-br from-blue-500/20 to-indigo-500/20 rounded-full blur-[100px] animate-blob animation-delay-2000" />
+      </div>
+
+      <div className="max-w-3xl mx-auto relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+        >
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Notifications</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Stay updated with your team activity.</p>
+            <h1 className="text-4xl font-black bg-gradient-to-r from-gray-900 to-indigo-600 dark:from-white dark:to-indigo-400 bg-clip-text text-transparent">Notifications</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Stay updated with your team activity.</p>
           </div>
-          <div className="flex items-center space-x-3">
+
+          <div className="flex items-center gap-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-1.5 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
             <button
               onClick={markAllAsRead}
-              className="text-sm font-medium text-aurora-600 dark:text-aurora-400 hover:text-aurora-700 dark:hover:text-aurora-300 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-all"
             >
-              Mark all as read
+              <CheckCircle size={16} />
+              <span>Mark all read</span>
             </button>
-            <div className="h-4 w-px bg-gray-300 dark:bg-gray-700"></div>
-            <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <div className="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
+            <button className="p-2 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-colors">
               <Filter size={20} />
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Filters */}
-        <NotificationFilters filter={filter} setFilter={setFilter} unreadCount={unreadCount} />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+        >
+          <NotificationFilters filter={filter} setFilter={setFilter} unreadCount={unreadCount} />
+        </motion.div>
 
         {/* Notifications List */}
-        <div className="space-y-4">
-          {filteredNotifications.length === 0 ? (
-            <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 border-dashed">
-              <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Bell className="text-gray-400" size={24} />
-              </div>
-              <h3 className="text-gray-900 dark:text-white font-medium">No notifications</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">You're all caught up!</p>
-            </div>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <NotificationItem
-                key={notification.id}
-                notification={notification}
-                markAsRead={markAsRead}
-                deleteNotification={deleteNotification}
-              />
-            ))
-          )}
-        </div>
+        <motion.div className="space-y-4">
+          <AnimatePresence mode='popLayout'>
+            {filteredNotifications.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="text-center py-20 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-dashed border-gray-300 dark:border-gray-700"
+              >
+                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                  <Bell className="text-gray-400 dark:text-gray-500" size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">No notifications</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">You're all caught up!</p>
+              </motion.div>
+            ) : (
+              filteredNotifications.map((notification) => (
+                <motion.div
+                  key={notification.id}
+                  layout
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                >
+                  <NotificationItem
+                    notification={notification}
+                    markAsRead={markAsRead}
+                    deleteNotification={deleteNotification}
+                  />
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   );

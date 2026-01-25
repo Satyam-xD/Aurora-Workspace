@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useChatContext } from '../../context/ChatContext';
-import { MessageCircle, Video, FileText, UserPlus, Calendar } from 'lucide-react';
+import { MessageCircle, Video, FileText, UserPlus, Calendar, CheckSquare, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const useNotifications = () => {
@@ -83,8 +83,48 @@ export const useNotifications = () => {
         }
     ]);
 
+    // Simulate real-time updates
+    useEffect(() => {
+        // Simulate a new task being assigned after 5 seconds
+        const taskTimer = setTimeout(() => {
+            const newTaskNotification = {
+                id: Date.now(),
+                type: 'task',
+                title: 'New Task Assigned',
+                description: 'You have been assigned to "Frontend Architecture"',
+                time: 'Just now',
+                read: false,
+                icon: CheckSquare,
+                color: 'bg-emerald-500'
+            };
+            setMockNotifications(prev => [newTaskNotification, ...prev]);
+        }, 5000);
+
+        // Simulate a deadline approaching after 10 seconds
+        const deadlineTimer = setTimeout(() => {
+            const deadlineNotification = {
+                id: Date.now() + 1,
+                type: 'deadline',
+                title: 'Deadline Approaching',
+                description: 'Task "Design System" is due in 2 hours',
+                time: 'Just now',
+                read: false,
+                icon: AlertCircle,
+                color: 'bg-amber-500'
+            };
+            setMockNotifications(prev => [deadlineNotification, ...prev]);
+        }, 12000);
+
+        return () => {
+            clearTimeout(taskTimer);
+            clearTimeout(deadlineTimer);
+        };
+    }, []);
+
+
     // Combine mock and real chat notifications
     const notifications = useMemo(() => {
+        // Sort by time (approximated) - putting unread chat messages at the top usually
         return [...chatNotifications, ...mockNotifications];
     }, [chatNotifications, mockNotifications]);
 
