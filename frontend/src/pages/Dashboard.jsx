@@ -2,8 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { Users, Clock, Zap, Video, Plus, Calendar, ArrowRight } from 'lucide-react';
+import { Users, Clock, Zap, Video, Plus, Calendar, ArrowRight, Sparkles, TrendingUp } from 'lucide-react';
 import { APP_FEATURES } from '../constants';
+import { motion } from 'framer-motion';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -38,67 +39,95 @@ const Dashboard = () => {
     const { data: dashboardData, isLoading } = useQuery({
         queryKey: ['dashboardData'],
         queryFn: fetchDashboardData,
-        staleTime: 60000 // Cache for 1 minute
+        staleTime: 60000
     });
 
     const activities = dashboardData?.activities || [];
     const teamMembers = dashboardData?.teamMembers || [];
-    const loading = isLoading;
 
-    // Use centralized features configuration
     const features = APP_FEATURES;
-
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 animate-fade-in pb-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50 /30 dark: from - gray - 900 dark: via - gray - 900 dark: to - indigo - 950 / 30">
+            {/* Animated Background Elements */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-[120px] animate-blob" />
+                <div className="absolute bottom-[-10%] left-[-5%] w-[700px] h-[700px] bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full blur-[120px] animate-blob animation-delay-2000" />
+                <div className="absolute top-[40%] left-[30%] w-[500px] h-[500px] bg-gradient-to-br from-pink-500/15 to-purple-500/15 rounded-full blur-[100px] animate-blob animation-delay-4000" />
+            </div>
 
+            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Welcome Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4"
+                >
                     <div>
-                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center">
-                            <Calendar size={14} className="mr-2" /> {today}
+                        <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+                            <Calendar size={16} className="text-indigo-500" />
+                            {today}
                         </p>
-                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
-                            Welcome back, <span className="bg-gradient-to-r from-aurora-600 to-purple-600 bg-clip-text text-transparent">{user.name.split(' ')[0]}</span>
+                        <h1 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-2">
+                            Welcome back, <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">{user.name.split(' ')[0]}</span>
                         </h1>
+                        <p className="text-gray-600 dark:text-gray-400 font-medium flex items-center gap-2">
+                            <Sparkles size={16} className="text-yellow-500" />
+                            Ready to make today productive?
+                        </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => navigate('/kanban', { state: { openNewTask: true } })}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+                            className="flex items-center gap-2 px-5 py-3 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl text-sm font-bold hover:bg-white dark:hover:bg-gray-800 transition-all shadow-lg"
                         >
-                            <Plus size={16} /> New Task
-                        </button>
-                        <button
+                            <Plus size={18} strokeWidth={2.5} /> New Task
+                        </motion.button>
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={() => navigate('/video-call')}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-aurora-600 text-white rounded-xl text-sm font-medium hover:bg-aurora-700 transition-colors shadow-lg shadow-aurora-500/20"
+                            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl text-sm font-bold transition-all shadow-lg shadow-indigo-500/30"
                         >
-                            <Video size={16} /> New Meeting
-                        </button>
+                            <Video size={18} strokeWidth={2.5} /> New Meeting
+                        </motion.button>
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Apps Grid */}
                 <div className="mb-12">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-                        <Zap size={20} className="mr-2 text-aurora-500" /> Quick Access
-                    </h2>
+                    <motion.h2
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-2xl font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2"
+                    >
+                        <Zap size={24} className="text-indigo-500" /> Quick Access
+                    </motion.h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {features.map((feature, index) => (
-                            <div key={index} onClick={() => navigate(feature.path)} className="cursor-pointer group">
-                                <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-200 hover:shadow-xl hover:-translate-y-1 hover:border-aurora-500/50">
-                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.iconBg} flex items-center justify-center text-white mb-4 shadow-lg`}>
-                                        <feature.icon size={22} />
+                            <motion.div
+                                key={index}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                whileHover={{ y: -4 }}
+                                onClick={() => navigate(feature.path)}
+                                className="cursor-pointer group"
+                            >
+                                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:border-indigo-400/50 dark:hover:border-indigo-500/50">
+                                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.iconBg} flex items-center justify-center text-white mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+                                        <feature.icon size={24} strokeWidth={2} />
                                     </div>
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{feature.title}</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">{feature.description}</p>
-                                    <div className="flex items-center text-aurora-600 dark:text-aurora-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
-                                        {feature.stats} <ArrowRight size={14} className="ml-1" />
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 font-medium">{feature.description}</p>
+                                    <div className="flex items-center text-indigo-600 dark:text-indigo-400 text-sm font-bold group-hover:translate-x-1 transition-transform">
+                                        {feature.stats} <ArrowRight size={16} className="ml-1" />
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                 </div>
@@ -106,88 +135,112 @@ const Dashboard = () => {
                 {/* Recent Activity / Overview Split */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left: Activity Feed */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="lg:col-span-2 space-y-6"
+                    >
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Activity</h2>
-                            <button className="text-sm text-aurora-600 hover:text-aurora-700 font-medium">View All</button>
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                                <TrendingUp size={24} className="text-indigo-500" />
+                                Recent Activity
+                            </h2>
+                            <button className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold">View All</button>
                         </div>
                         {activities.length > 0 ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
                                 <div className="space-y-4">
                                     {activities.map((activity, index) => (
-                                        <div key={index} className="flex items-start gap-4 pb-4 border-b border-gray-100 dark:border-gray-700 last:border-0 last:pb-0">
-                                            <div className="mt-1 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                                                <Users size={14} />
+                                        <motion.div
+                                            key={index}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: 0.5 + index * 0.1 }}
+                                            className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0"
+                                        >
+                                            <div className="mt-1 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                                                <Users size={18} />
                                             </div>
                                             <div>
-                                                <p className="text-sm text-gray-900 dark:text-white">
-                                                    <span className="font-bold">Team Admin</span> {activity.text}
+                                                <p className="text-sm text-gray-900 dark:text-white font-medium">
+                                                    <span className="font-black">Team Admin</span> {activity.text}
                                                 </p>
-                                                <p className="text-xs text-gray-500 mt-1">{new Date(activity.createdAt).toLocaleDateString()} • {new Date(activity.createdAt).toLocaleTimeString()}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{new Date(activity.createdAt).toLocaleDateString()} • {new Date(activity.createdAt).toLocaleTimeString()}</p>
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     ))}
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm min-h-[300px] flex items-center justify-center text-center">
-                                <div className="space-y-3">
-                                    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                                        <Clock size={24} className="text-gray-400" />
+                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg min-h-[300px] flex items-center justify-center text-center">
+                                <div className="space-y-4">
+                                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
+                                        <Clock size={32} className="text-indigo-500" />
                                     </div>
                                     <div>
-                                        <p className="text-gray-900 dark:text-white font-medium">All caught up!</p>
-                                        <p className="text-sm text-gray-500">No new notifications.</p>
+                                        <p className="text-gray-900 dark:text-white font-bold text-lg">All caught up!</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">No new notifications.</p>
                                     </div>
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </motion.div>
 
                     {/* Right: Team Snapshot */}
-                    <div className="space-y-6">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">My Team</h2>
-                        <div className="bg-gradient-to-br from-aurora-600 to-purple-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="space-y-6"
+                    >
+                        <h2 className="text-2xl font-black text-gray-900 dark:text-white">My Team</h2>
+                        <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
                             <div className="relative z-10">
                                 <div className="flex items-center justify-between mb-8">
-                                    <div className="p-3 bg-white/20 backdrop-blur-md rounded-xl">
-                                        <Users size={24} />
+                                    <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl shadow-lg">
+                                        <Users size={28} strokeWidth={2} />
                                     </div>
-                                    <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg uppercase tracking-wider">Active</span>
+                                    <span className="text-xs font-black bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-md">Active</span>
                                 </div>
-                                <h3 className="text-3xl font-bold mb-1">{user.role === 'admin' ? 'Admin Access' : 'Member'}</h3>
-                                <p className="text-aurora-100 text-sm mb-6">Manage your workspace collaboration.</p>
+                                <h3 className="text-4xl font-black mb-2">{user.role === 'admin' ? 'Admin Access' : 'Member'}</h3>
+                                <p className="text-indigo-100 text-sm mb-8 font-medium">Manage your workspace collaboration.</p>
 
                                 {user.role === 'admin' && (
-                                    <button onClick={() => navigate('/team-management')} className="w-full py-3 bg-white text-aurora-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors shadow-lg">
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => navigate('/team-management')}
+                                        className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all shadow-xl"
+                                    >
                                         Manage Team
-                                    </button>
+                                    </motion.button>
                                 )}
                                 {user.role !== 'admin' && (
                                     <div className="flex -space-x-3 mt-2">
                                         {teamMembers.length > 0 ? teamMembers.slice(0, 5).map(m => (
-                                            <div key={m._id} className="w-10 h-10 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-xs font-bold" title={m.name}>
+                                            <div key={m._id} className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg" title={m.name}>
                                                 {m.name.charAt(0)}
                                             </div>
                                         )) : (
                                             <p className="text-sm opacity-80">No team members</p>
                                         )}
                                         {teamMembers.length > 5 && (
-                                            <div className="w-10 h-10 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-xs font-bold">
+                                            <div className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg">
                                                 +{teamMembers.length - 5}
                                             </div>
                                         )}
                                     </div>
                                 )}
                             </div>
-                            {/* Decor */}
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                            {/* Decorative Elements */}
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
-
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -97,22 +97,34 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4"
+                    onClick={handleCloseModal}
                 >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ duration: 0.2 }}
-                        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700"
+                        className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-indigo-200/50 dark:border-indigo-800/50"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {editingId ? 'Edit Entry' : 'Add New Entry'}
-                            </h2>
-                            <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                                <X size={20} className="text-gray-500" />
-                            </button>
+                        <div className="p-6 border-b border-indigo-100 dark:border-indigo-900/50 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                                    <Lock size={20} className="text-white" />
+                                </div>
+                                <h2 className="text-2xl font-black bg-gradient-to-r from-indigo-900 to-purple-900 dark:from-indigo-200 dark:to-purple-200 bg-clip-text text-transparent">
+                                    {editingId ? 'Edit Entry' : 'Add New Entry'}
+                                </h2>
+                            </div>
+                            <motion.button
+                                whileHover={{ scale: 1.1, rotate: 90 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={handleCloseModal}
+                                className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
+                            >
+                                <X size={20} className="text-gray-500 dark:text-gray-400" />
+                            </motion.button>
                         </div>
 
                         <form onSubmit={handleFormSubmit(onSubmit)} className="p-6 space-y-6">
@@ -123,7 +135,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                 <input
                                     type="text"
                                     {...register('title')}
-                                    className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border ${errors.title ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all`}
+                                    className={`w-full px-4 py-3 bg-white/50 dark:bg-gray-800/50 border ${errors.title ? 'border-indigo-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 dark:text-white transition-all font-medium`}
                                     placeholder="e.g. Google Account"
                                 />
                                 {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title.message}</p>}
@@ -140,7 +152,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                         render={({ field }) => (
                                             <Listbox value={field.value} onChange={field.onChange}>
                                                 <div className="relative mt-1">
-                                                    <Listbox.Button className="relative w-full cursor-default rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-4 pr-10 text-left border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 sm:text-sm text-gray-900 dark:text-white transition-all">
+                                                    <Listbox.Button className="relative w-full cursor-default rounded-xl bg-white/50 dark:bg-gray-800/50 py-3 pl-4 pr-10 text-left border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-white transition-all font-medium">
                                                         <span className="block truncate">
                                                             {categories.find(c => c.value === field.value)?.label || 'Select Category'}
                                                         </span>
@@ -162,7 +174,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                                                 <Listbox.Option
                                                                     key={catIdx}
                                                                     className={({ active }) =>
-                                                                        `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-300' : 'text-gray-900 dark:text-gray-100'
+                                                                        `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-900 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-100'
                                                                         }`
                                                                     }
                                                                     value={cat.value}
@@ -176,7 +188,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                                                                 {cat.label}
                                                                             </span>
                                                                             {selected ? (
-                                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-600 dark:text-red-400">
+                                                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
                                                                                     <Check className="h-5 w-5" aria-hidden="true" />
                                                                                 </span>
                                                                             ) : null}
@@ -199,7 +211,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                     <input
                                         type="text"
                                         {...register('url')}
-                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all"
+                                        className="w-full px-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 dark:text-white transition-all font-medium"
                                         placeholder="example.com"
                                     />
                                 </div>
@@ -215,7 +227,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                         <input
                                             type="text"
                                             {...register('username')}
-                                            className={`w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border ${errors.username ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all`}
+                                            className={`w-full pl-11 pr-4 py-3 bg-white/50 dark:bg-gray-800/50 border ${errors.username ? 'border-indigo-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 dark:text-white transition-all font-medium`}
                                             placeholder="user@example.com"
                                         />
                                     </div>
@@ -235,13 +247,13 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                                 register('password').onChange(e);
                                                 // Trigger re-render for strength calc if needed or handled by watch/state
                                             }}
-                                            className={`w-full pl-11 pr-32 py-3 bg-gray-50 dark:bg-gray-800 border ${errors.password ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all font-mono`}
+                                            className={`w-full pl-11 pr-32 py-3 bg-white/50 dark:bg-gray-800/50 border ${errors.password ? 'border-indigo-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 dark:text-white transition-all font-mono`}
                                             placeholder="StrongPassword123!"
                                         />
                                         <button
                                             type="button"
                                             onClick={generatePassword}
-                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-1"
+                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg text-xs font-bold text-white transition-all shadow-sm hover:shadow-md"
                                         >
                                             Generate
                                         </button>
@@ -282,7 +294,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                 <textarea
                                     {...register('notes')}
                                     rows={3}
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 text-gray-900 dark:text-white transition-all"
+                                    className="w-full px-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-gray-900 dark:text-white transition-all font-medium"
                                     placeholder="Security questions, backup codes, etc."
                                 />
                             </div>
@@ -299,7 +311,7 @@ const PasswordModal = ({ isModalOpen, handleCloseModal, handleSubmit, formData, 
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-8 py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-white dark:to-gray-200 text-white dark:text-gray-900 rounded-xl font-bold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                                    className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 transform hover:-translate-y-0.5 transition-all duration-200"
                                 >
                                     {editingId ? 'Save Changes' : 'Create Entry'}
                                 </button>
