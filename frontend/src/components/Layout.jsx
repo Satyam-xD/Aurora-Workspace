@@ -3,9 +3,12 @@ import Header from './Header';
 import { Sparkles, Users, Info, CreditCard, MessageCircle, Video, FileText, Kanban, Mail, LifeBuoy, ArrowRight, Shield, Lock, FileQuestion } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChatContext } from '../context/ChatContext';
+import VideoCall from './VideoCall/VideoCall';
 
 const Layout = ({ children }) => {
   const { user } = useAuth();
+  const { call, isCalling, callEnded, endCall } = useChatContext();
   const location = useLocation();
 
   // Routes where we want a full-screen app experience without a footer
@@ -26,6 +29,18 @@ const Layout = ({ children }) => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col pt-16">
       <Header />
       <main className="flex-1 flex flex-col">{children}</main>
+
+      {/* Global Video Call Overlay */}
+      {(call?.isReceivingCall || isCalling) && !callEnded && (
+        <VideoCall
+          isIncoming={call?.isReceivingCall}
+          callerSignal={call?.signal}
+          callerName={call?.name}
+          callerId={call?.from}
+          userToCall={call?.userToCall}
+          onEndCall={endCall}
+        />
+      )}
 
       {/* Footer - Hidden on app-like pages */}
       {!shouldHideFooter && (

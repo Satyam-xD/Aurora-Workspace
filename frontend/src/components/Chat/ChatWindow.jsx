@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'dompurify';
 
-const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser, isLoadingHistory, isUploadingFile }) => {
+const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, handleSend, onlineCount, isTyping, onFileUpload, renameGroup, addToGroup, removeFromGroup, chatsData, searchUsers, currentUser, isLoadingHistory, isUploadingFile, handleStartCall }) => {
     const [showEmoji, setShowEmoji] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const [infoSearchResults, setInfoSearchResults] = useState([]);
@@ -41,10 +41,17 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
         e.target.value = '';
     };
 
-    const startVideoCall = () => {
-        // Create a unique room name based on chat ID
-        const roomName = `aurora-${activeChat.substring(0, 8)}`;
-        navigate(`/video-call?room=${roomName}`);
+    const startCall = () => {
+        // Find the other user in the chat
+        if (chatsData[activeChat]?.type === 'group') {
+            toast.info("Group video calls are coming soon!");
+            return;
+        }
+
+        const otherUser = chatsData[activeChat].users.find(u => u._id !== currentUser._id);
+        if (otherUser) {
+            handleStartCall(otherUser._id);
+        }
     };
 
     // Helper to format date groups
@@ -127,7 +134,7 @@ const ChatWindow = ({ activeChat, messages, message, setMessage, handleTyping, h
                         <Phone size={18} />
                     </button>
                     <button
-                        onClick={startVideoCall}
+                        onClick={startCall}
                         className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                         aria-label="Start video call"
                     >

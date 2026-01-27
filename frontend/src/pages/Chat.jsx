@@ -27,7 +27,8 @@ const Chat = () => {
     removeFromGroup,
     user,
     isLoadingHistory,
-    isUploadingFile
+    isUploadingFile,
+    startCall
   } = useChat();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -85,6 +86,7 @@ const Chat = () => {
         currentUser={user}
         isLoadingHistory={isLoadingHistory}
         isUploadingFile={isUploadingFile}
+        handleStartCall={startCall}
       />
     </div>
   );
