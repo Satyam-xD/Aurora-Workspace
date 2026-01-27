@@ -225,6 +225,49 @@ export const ChatProvider = ({ children }) => {
         };
     }, [user]);
 
+    // Video Call State
+    const [call, setCall] = useState({});
+    const [callAccepted, setCallAccepted] = useState(false);
+    const [callEnded, setCallEnded] = useState(false);
+    const [isCalling, setIsCalling] = useState(false);
+    const [stream, setStream] = useState(null);
+
+    const startCall = (userId) => {
+        setIsCalling(true);
+        setCall({ isReceivingCall: false, userToCall: userId });
+        // The VideoCall component will handle the actual signaling creation when it mounts and sees 'isCalling'
+    };
+
+    const answerCall = () => {
+        setCallAccepted(true);
+    };
+
+    const endCall = () => {
+        setCall({});
+        setCallAccepted(false);
+        setCallEnded(true); // Trigger cleanup
+        setIsCalling(false);
+        setTimeout(() => setCallEnded(false), 1000); // Reset after cleanup
+    };
+
+    // Socket listeners for Calls
+    useEffect(() => {
+        if (!socketRef.current) return;
+
+        socketRef.current.on('callUser', ({ from, name, signal }) => {
+            console.log("Receiving call from", name);
+            setCall({ isReceivingCall: true, from, name, signal });
+        });
+
+        // We also need to listen for callEnded from remote here? 
+        // Or let the VideoCall component handle it? 
+        // The VideoCall component handles 'callEnded' event to close itself.
+
+        return () => {
+            socketRef.current?.off('callUser');
+        };
+    }, [socketRef.current]);
+
     const value = {
         activeChat,
         setActiveChat,
@@ -239,7 +282,17 @@ export const ChatProvider = ({ children }) => {
         setFetchedChats,
         fetchUserChats,
         user,
-        onlineUsers // Expose this
+        onlineUsers,
+        chats: Object.values(chatsData), // Export chats as array
+        // Call additions
+        call,
+        callAccepted,
+        callEnded,
+        isCalling,
+        startCall,
+        answerCall,
+        endCall,
+        setCallAccepted
     };
 
     return (

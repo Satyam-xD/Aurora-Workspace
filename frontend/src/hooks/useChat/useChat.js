@@ -14,10 +14,10 @@ export const useChat = () => {
         socketRef,
         socketConnected,
         isLoadingHistory,
-        setIsLoadingHistory,
         fetchedChats,
         setFetchedChats,
-        onlineUsers
+        onlineUsers,
+        startCall
     } = useChatContext();
 
     const [message, setMessage] = useState('');
@@ -422,6 +422,6 @@ export const useChat = () => {
         handleSend, handleCreateGroup, searchUsers, handleAccessChat,
         isTyping, handleTyping, handleFileUpload,
         renameGroup, addToGroup, removeFromGroup,
-        user, isLoadingHistory, isUploadingFile, totalUnreadCount
+        user, isLoadingHistory, isUploadingFile, totalUnreadCount, startCall
     };
 };

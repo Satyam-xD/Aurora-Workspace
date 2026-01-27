@@ -1,245 +1,244 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { JitsiMeeting } from '@jitsi/react-sdk';
-import { Video, Sparkles, MapPin, Loader2, ArrowLeft, Copy, Check } from 'lucide-react';
-import { toast } from 'sonner';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useChatContext } from '../context/ChatContext';
+import { Video, Phone, Search, Users, Wifi, WifiOff, X } from 'lucide-react';
 
-const VideoCall = () => {
-  const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+const VideoCallPage = () => {
+    const { startCall, onlineUsers, chats, user } = useChatContext();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredUsers, setFilteredUsers] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
 
-  // Initialize state from URL or Auth
-  const initialRoom = searchParams.get('room') || 'aurora-room';
-  const initialName = user?.name || 'User';
+    // Extract unique users from chats
+    useEffect(() => {
+        if (chats && chats.length > 0) {
+            const users = chats.map(chat => {
+                // Get the other participant in the chat
+                const otherUser = chat.participants?.find(p => p._id !== user?._id);
+                return otherUser;
+            }).filter(Boolean);
 
-  const [room, setRoom] = useState(initialRoom);
-  const [name, setName] = useState(initialName);
-  const [isJoined, setIsJoined] = useState(false);
-  const [jitsiLoaded, setJitsiLoaded] = useState(false);
+            // Filter based on search query
+            const filtered = users.filter(u =>
+                u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
 
-  const handleJoin = useCallback((e) => {
-    if (e) e.preventDefault();
-    if (!room || !name) {
-      toast.error('Please enter both room name and your name');
-      return;
-    }
-
-    // Update URL to reflect current room
-    setSearchParams({ room });
-    setIsJoined(true);
-  }, [room, name, setSearchParams]);
-
-  const handleClose = useCallback(() => {
-    setIsJoined(false);
-    setJitsiLoaded(false);
-    toast.info('Left the meeting');
-  }, []);
-
-  if (isJoined) {
-    return (
-      <MeetingView
-        room={room}
-        name={name}
-        handleClose={handleClose}
-        jitsiLoaded={jitsiLoaded}
-        setJitsiLoaded={setJitsiLoaded}
-      />
-    );
-  }
-
-  return (
-    <LobbyView
-      room={room}
-      setRoom={setRoom}
-      name={name}
-      setName={setName}
-      handleJoin={handleJoin}
-    />
-  );
-};
-
-// Sub-component for the Meeting Interface
-const MeetingView = ({ room, name, handleClose, jitsiLoaded, setJitsiLoaded }) => {
-  const configOverwrite = useMemo(() => ({
-    startWithAudioMuted: true,
-    disableThirdPartyRequests: true,
-    prejoinPageEnabled: false,
-    theme: {
-      default: 'dark'
-    },
-    resolution: 720,
-    constraints: {
-      video: {
-        height: {
-          ideal: 720,
-          max: 720,
-          min: 240
+            setFilteredUsers(filtered);
         }
-      }
-    }
-  }), []);
+    }, [chats, searchQuery, user]);
 
-  const interfaceConfigOverwrite = useMemo(() => ({
-    TOOLBAR_BUTTONS: [
-      'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-      'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
-      'sharedvideo', 'settings', 'raisehand',
-      'videoquality', 'filmstrip', 'tileview', 'videobackgroundblur', 'mute-everyone'
-    ],
-    SHOW_JITSI_WATERMARK: false,
-    SHOW_WATERMARK_FOR_GUESTS: false,
-    DEFAULT_BACKGROUND: '#0B0C15',
-    DEFAULT_REMOTE_DISPLAY_NAME: 'Fellow Aurora User',
-  }), []);
+    const isUserOnline = (userId) => {
+        return onlineUsers?.some(id => id === userId);
+    };
 
-  return (
-    <div className="h-screen w-full bg-[#0B0C15] relative flex flex-col overflow-hidden">
-      {/* Custom Header */}
-      <div className="absolute top-4 left-4 z-50">
-        <button
-          onClick={handleClose}
-          className="bg-black/50 hover:bg-black/70 text-white backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-2 transition-all border border-white/10 shadow-lg"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-sm font-medium">Leave</span>
-        </button>
-      </div>
+    const handleCallUser = (targetUser) => {
+        if (targetUser && targetUser._id) {
+            startCall(targetUser._id);
+        }
+    };
 
-      {/* Loading State Overlay */}
-      {!jitsiLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0B0C15] z-40">
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 animate-pulse"></div>
-              <Loader2 size={48} className="text-blue-500 animate-spin relative z-10" />
-            </div>
-            <p className="text-gray-400 font-medium animate-pulse">Securely connecting to room...</p>
-          </div>
-        </div>
-      )}
+    const UserCard = ({ user: targetUser }) => {
+        const online = isUserOnline(targetUser._id);
 
-      <JitsiMeeting
-        domain="meet.jit.si"
-        roomName={room}
-        configOverwrite={configOverwrite}
-        interfaceConfigOverwrite={interfaceConfigOverwrite}
-        userInfo={{ displayName: name }}
-        onApiReady={(externalApi) => {
-          externalApi.on('videoConferenceJoined', () => setJitsiLoaded(true));
-          externalApi.on('videoConferenceLeft', handleClose);
-        }}
-        getIFrameRef={(iframeRef) => {
-          iframeRef.style.height = '100%';
-          iframeRef.style.width = '100%';
-          iframeRef.style.border = 'none';
-          iframeRef.style.background = '#0B0C15';
-        }}
-      />
-    </div>
-  );
-};
-
-// Sub-component for the Lobby Interface
-const LobbyView = ({ room, setRoom, name, setName, handleJoin }) => {
-  const [copied, setCopied] = useState(false);
-
-  const copyInvite = () => {
-    const url = `${window.location.origin}/video-call?room=${encodeURIComponent(room)}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Invitation link copied to clipboard');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="min-h-screen bg-[#0B0C15] text-white font-sans flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-gray-900/0 to-gray-900/0"></div>
-        <div className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse"></div>
-        <div className="absolute -bottom-[20%] -left-[10%] w-[60%] h-[60%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse [animation-delay:2s]"></div>
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-blue-600 to-violet-600 shadow-2xl shadow-blue-500/20 mb-6 animate-float">
-            <Video size={36} className="text-white" strokeWidth={2.5} />
-          </div>
-          <h1 className="text-4xl font-black tracking-tight mb-2 bg-gradient-to-r from-white via-blue-100 to-blue-200 bg-clip-text text-transparent">
-            Aurora Meet
-          </h1>
-          <p className="text-gray-400 font-medium">Free, unlimited video conferencing</p>
-        </div>
-
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-          <form onSubmit={handleJoin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">Display Name</label>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-violet-600 rounded-xl opacity-0 group-focus-within:opacity-100 blur transition-opacity duration-300 -z-10"></div>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    <Sparkles size={18} />
-                  </div>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-gray-900/50 border border-white/10 text-white placeholder-gray-500 rounded-xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-transparent focus:ring-1 focus:ring-white/20 transition-all font-medium"
-                    placeholder="Enter your name"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400 ml-1">
-                Room Name
-              </label>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-violet-600 rounded-xl opacity-0 group-focus-within:opacity-100 blur transition-opacity duration-300 -z-10"></div>
-                <div className="relative flex items-center">
-                  <div className="absolute left-4 pointer-events-none text-gray-400">
-                    <MapPin size={18} />
-                  </div>
-                  <input
-                    type="text"
-                    value={room}
-                    onChange={(e) => setRoom(e.target.value)}
-                    className="w-full bg-gray-900/50 border border-white/10 text-white placeholder-gray-500 rounded-xl py-3.5 pl-11 pr-12 focus:outline-none focus:border-transparent focus:ring-1 focus:ring-white/20 transition-all font-medium"
-                    placeholder="e.g. Daily Standup"
-                  />
-                  <button
-                    type="button"
-                    onClick={copyInvite}
-                    className="absolute right-2 p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                    title="Copy Invite Link"
-                  >
-                    {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/20 transform transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+        return (
+            <div
+                className="group relative bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 hover:border-aurora-500 dark:hover:border-aurora-500 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer"
+                onClick={() => setSelectedUser(targetUser)}
             >
-              <span>Join Meeting Now</span>
-              <Sparkles size={18} className="transition-transform group-hover:rotate-12" />
-            </button>
+                <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-aurora-400 to-aurora-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                            {targetUser.name?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                        {/* Online indicator */}
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 ${online ? 'bg-green-500' : 'bg-gray-400'
+                            }`}>
+                            {online && (
+                                <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75"></div>
+                            )}
+                        </div>
+                    </div>
 
-            <div className="text-center">
-              <p className="text-[10px] text-gray-500/80">
-                Powered by <span className="font-bold text-gray-500">Jitsi Meet</span> • No signup required
-              </p>
+                    {/* User Info */}
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            {targetUser.name || 'Unknown User'}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                            {online ? (
+                                <>
+                                    <Wifi size={14} className="text-green-500" />
+                                    <span className="text-green-600 dark:text-green-400">Online</span>
+                                </>
+                            ) : (
+                                <>
+                                    <WifiOff size={14} className="text-gray-400" />
+                                    <span>Offline</span>
+                                </>
+                            )}
+                        </p>
+                    </div>
+
+                    {/* Call Button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleCallUser(targetUser);
+                        }}
+                        disabled={!online}
+                        className={`p-3 rounded-full transition-all duration-300 ${online
+                                ? 'bg-aurora-600 hover:bg-aurora-700 text-white hover:scale-110 shadow-lg hover:shadow-aurora-500/50'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                            }`}
+                        title={online ? 'Start video call' : 'User is offline'}
+                    >
+                        <Video size={20} />
+                    </button>
+                </div>
             </div>
-          </form>
+        );
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-aurora-50/20 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-4 md:p-8">
+            <div className="max-w-5xl mx-auto">
+                {/* Header */}
+                <div className="text-center mb-8 animate-fade-in">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-aurora-500 to-aurora-700 rounded-3xl mb-6 shadow-2xl shadow-aurora-500/30 animate-float">
+                        <Video size={40} className="text-white" />
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-3 bg-gradient-to-r from-aurora-600 to-aurora-800 bg-clip-text text-transparent">
+                        Video Calls
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 text-lg">
+                        Connect face-to-face with your team members
+                    </p>
+                </div>
+
+                {/* Search Bar */}
+                <div className="mb-6 relative animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search by name or email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:border-aurora-500 focus:ring-4 focus:ring-aurora-500/20 transition-all outline-none text-lg"
+                        />
+                    </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4 mb-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                                <Wifi className="text-green-600 dark:text-green-400" size={24} />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {onlineUsers?.length || 0}
+                                </p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Online Now</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-aurora-100 dark:bg-aurora-900/30 rounded-xl flex items-center justify-center">
+                                <Users className="text-aurora-600 dark:text-aurora-400" size={24} />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {filteredUsers.length}
+                                </p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Total Contacts</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Users List */}
+                <div className="space-y-3 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                    {filteredUsers.length > 0 ? (
+                        filteredUsers.map((targetUser, index) => (
+                            <div
+                                key={targetUser._id}
+                                className="animate-slide-up"
+                                style={{ animationDelay: `${0.4 + index * 0.05}s` }}
+                            >
+                                <UserCard user={targetUser} />
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-16">
+                            <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Users size={40} className="text-gray-400" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                No contacts found
+                            </h3>
+                            <p className="text-gray-500 dark:text-gray-400">
+                                {searchQuery ? 'Try a different search term' : 'Start a chat to add contacts'}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Info Footer */}
+                <div className="mt-8 p-6 bg-aurora-50 dark:bg-aurora-900/10 rounded-2xl border border-aurora-200 dark:border-aurora-800 animate-slide-up" style={{ animationDelay: '0.5s' }}>
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-aurora-100 dark:bg-aurora-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Phone className="text-aurora-600" size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
+                                Peer-to-Peer Video Calls
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                All calls are encrypted and established directly between users for maximum privacy and quality.
+                                Make sure you have a stable internet connection for the best experience.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Custom Animations */}
+            <style>{`
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slide-up {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                @keyframes float {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.6s ease-out;
+                }
+                .animate-slide-up {
+                    animation: slide-up 0.6s ease-out;
+                    animation-fill-mode: both;
+                }
+                .animate-float {
+                    animation: float 3s ease-in-out infinite;
+                }
+            `}</style>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
-export default VideoCall;
+export default VideoCallPage;

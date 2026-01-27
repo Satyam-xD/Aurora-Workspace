@@ -46,12 +46,25 @@ export const setupSocket = (io) => {
             socket.to(roomId).emit("userJoined", { id: socket.id, name });
         });
 
-        socket.on("callUser", (data) => {
-            io.to(data.userToCall).emit("callUser", { signal: data.signalData, from: data.from, name: data.name });
+        // WebRTC Signaling
+        socket.on("callUser", ({ userToCall, signalData, from, name }) => {
+            console.log(`Call initiated from ${from} to ${userToCall}`);
+            io.to(userToCall).emit("callUser", { signal: signalData, from, name });
         });
 
         socket.on("answerCall", (data) => {
+            console.log(`Call answered by ${socket.id} to ${data.to}`);
             io.to(data.to).emit("callAccepted", data.signal);
+        });
+
+        socket.on("ice-candidate", ({ to, candidate }) => {
+            console.log(`ICE candidate from ${socket.id} to ${to}`);
+            io.to(to).emit("ice-candidate", candidate);
+        });
+
+        socket.on("endCall", ({ to }) => {
+            console.log(`Call ended by ${socket.id} for ${to}`);
+            io.to(to).emit("callEnded");
         });
 
         // Chat functionality
