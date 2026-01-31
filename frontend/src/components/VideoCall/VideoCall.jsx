@@ -1,7 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatContext } from '../../context/ChatContext';
 import { useDirectCall } from '../../hooks/useVideoCall/useDirectCall';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, X, Monitor, MonitorOff, Maximize2, Minimize2 } from 'lucide-react';
+
+const CallTimer = ({ startTime }) => {
+    const [duration, setDuration] = useState(0);
+
+    useEffect(() => {
+        if (!startTime) return;
+
+        const updateTimer = () => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            setDuration(elapsed);
+        };
+
+        // Update immediately
+        updateTimer();
+
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [startTime]);
+
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
+    const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    return (
+        <span className="text-sm font-medium">{formatted}</span>
+    );
+};
 
 const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall, onEndCall, onAnswer, isVideoCall = true }) => {
     const { user } = useChatContext();
@@ -17,7 +44,7 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
         isScreenSharing,
         mediaError,
         connectionState,
-        callDuration,
+        startTime,
         myVideoRef,
         userVideoRef,
         answerCall,
@@ -35,13 +62,6 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
         onAnswer,
         isVideoCall
     });
-
-    // Format call duration
-    const formatDuration = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
 
     // Connection quality indicator
     const getConnectionQuality = () => {
@@ -68,7 +88,10 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
                 <div className="absolute top-0 left-0 right-0 p-6 z-10 flex justify-between items-start bg-gradient-to-b from-black/80 via-black/40 to-transparent">
                     <div className="text-white">
                         <h3 className="text-2xl font-bold mb-1">
-                            {isIncoming ? callerName : "Calling..."}
+                            {isIncoming
+                                ? `${callerName} 📞 ${user?.name || 'You'}`
+                                : `${user?.name || 'You'} 📞 ${callerName || '...'}`
+                            }
                         </h3>
                         <div className="flex items-center gap-3">
                             <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-sm`}>
@@ -78,9 +101,9 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
                             <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-sm`}>
                                 <span className="text-sm font-medium">{quality.text}</span>
                             </div>
-                            {callAccepted && connectionState === 'connected' && (
+                            {callAccepted && connectionState === 'connected' && startTime && (
                                 <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur-sm">
-                                    <span className="text-sm font-medium">{formatDuration(callDuration)}</span>
+                                    <CallTimer startTime={startTime} />
                                 </div>
                             )}
                         </div>
@@ -139,10 +162,10 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
                         <div className="text-white flex flex-col items-center">
                             {/* Avatar/Waiting View */}
                             <div className="w-32 h-32 bg-gradient-to-br from-aurora-500 to-aurora-700 rounded-full flex items-center justify-center text-4xl font-bold mb-6 shadow-2xl shadow-aurora-500/50 animate-pulse">
-                                {isIncoming && callerName ? callerName[0].toUpperCase() : (userToCall ? 'C' : 'U')}
+                                {callerName ? callerName[0].toUpperCase() : (userToCall ? 'C' : 'U')}
                             </div>
                             <p className="text-2xl mb-2 font-semibold">
-                                {callAccepted ? (isIncoming ? callerName : "Connected") : (isIncoming ? `${callerName} is calling...` : "Calling...")}
+                                {callAccepted ? (isIncoming ? callerName : "Connected") : (isIncoming ? `${callerName} is calling...` : `Calling ${callerName || '...'}...`)}
                             </p>
                             <p className="text-gray-400 mb-8">
                                 {callAccepted ? "Call in progress" : (isIncoming ? (isVideoCall ? "Incoming video call" : "Incoming audio call") : "Waiting for response...")}
@@ -151,13 +174,6 @@ const VideoCall = ({ isIncoming, callerSignal, callerName, callerId, userToCall,
                             {/* Incoming Call Actions */}
                             {isIncoming && !callAccepted && (
                                 <div className="flex items-center gap-6">
-                                    <button
-                                        onClick={leaveCall}
-                                        className="p-4 bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white rounded-full transition-all backdrop-blur-sm ring-1 ring-red-500/50"
-                                        title="Decline"
-                                    >
-                                        <X size={24} />
-                                    </button>
                                     <button
                                         onClick={answerCall}
                                         className="px-10 py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full font-semibold shadow-2xl shadow-green-500/50 transform hover:scale-105 transition-all flex items-center gap-3 text-lg"

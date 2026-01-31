@@ -56,7 +56,7 @@ export const ChatProvider = ({ children }) => {
     }, [activeChat]);
 
     // Fetch User Chats
-    const fetchUserChats = async () => {
+    const fetchUserChats = useCallback(async () => {
         const token = user?.token || JSON.parse(localStorage.getItem('user'))?.token;
         if (!token) return;
 
@@ -67,60 +67,64 @@ export const ChatProvider = ({ children }) => {
             const data = await res.json();
 
             if (res.ok) {
-                const newChatsData = { ...chatsData };
+                setChatsData(prevChatsData => {
+                    const newChatsData = { ...prevChatsData };
+                    let hasChanges = false;
 
-                data.forEach(chat => {
-                    let displayName = chat.chatName;
-                    if (!chat.isGroupChat && chat.users) {
-                        const otherUser = chat.users.find(u => u._id !== (user?._id || user?.id)) || chat.users[0];
-                        displayName = otherUser?.name || "Unknown User";
-                    }
+                    data.forEach(chat => {
+                        let displayName = chat.chatName;
+                        if (!chat.isGroupChat && chat.users) {
+                            const otherUser = chat.users.find(u => u._id !== (user?._id || user?.id)) || chat.users[0];
+                            displayName = otherUser?.name || "Unknown User";
+                        }
 
-                    let initialMessages = [];
-                    if (chat.latestMessage) {
-                        const msg = chat.latestMessage;
-                        const senderName = msg.sender?.name || "Unknown";
+                        let initialMessages = [];
+                        if (chat.latestMessage) {
+                            const msg = chat.latestMessage;
+                            const senderName = msg.sender?.name || "Unknown";
 
-                        initialMessages = [{
-                            id: msg._id,
-                            text: msg.text,
-                            sender: senderName,
-                            time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            isMe: (msg.sender?._id || msg.sender) === (user?._id || user?.id),
-                            senderAvatar: senderName ? senderName[0] : 'U',
-                            type: msg.type || 'text',
-                            fullTime: msg.createdAt
-                        }];
-                    }
+                            initialMessages = [{
+                                id: msg._id,
+                                text: msg.text,
+                                sender: senderName,
+                                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                isMe: (msg.sender?._id || msg.sender) === (user?._id || user?.id),
+                                senderAvatar: senderName ? senderName[0] : 'U',
+                                type: msg.type || 'text',
+                                fullTime: msg.createdAt
+                            }];
+                        }
 
-                    if (!newChatsData[chat._id]) {
-                        newChatsData[chat._id] = {
-                            id: chat._id,
-                            name: displayName,
-                            type: chat.isGroupChat ? 'group' : 'private',
-                            isGroupChat: chat.isGroupChat,
-                            users: chat.users || [],
-                            groupAdmin: chat.groupAdmin,
-                            onlineCount: chat.users?.length || 0,
-                            messages: initialMessages,
-                            unread: false,
-                            unreadCount: 0
-                        };
-                    }
+                        if (!newChatsData[chat._id]) {
+                            newChatsData[chat._id] = {
+                                id: chat._id,
+                                name: displayName,
+                                type: chat.isGroupChat ? 'group' : 'private',
+                                isGroupChat: chat.isGroupChat,
+                                users: chat.users || [],
+                                groupAdmin: chat.groupAdmin,
+                                onlineCount: chat.users?.length || 0,
+                                messages: initialMessages,
+                                unread: false,
+                                unreadCount: 0
+                            };
+                            hasChanges = true;
+                        }
+                    });
+
+                    return hasChanges ? newChatsData : prevChatsData;
                 });
-
-                setChatsData(newChatsData);
             }
         } catch (err) {
             console.error("Failed to fetch chats", err);
         }
-    };
+    }, [user]);
 
     useEffect(() => {
         if (user) {
             fetchUserChats();
         }
-    }, [user]);
+    }, [user, fetchUserChats]);
 
     // Socket Connection
     useEffect(() => {

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChatContext } from '../../context/ChatContext';
+import { logger } from '../../utils/logger';
 
 export const useDirectCall = ({
     isIncoming,
@@ -20,24 +21,19 @@ export const useDirectCall = ({
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [mediaError, setMediaError] = useState(null);
     const [connectionState, setConnectionState] = useState('connecting');
-    const [callDuration, setCallDuration] = useState(0);
+    const [startTime, setStartTime] = useState(null);
 
     const myVideo = useRef();
     const userVideo = useRef();
     const connectionRef = useRef();
     const streamRef = useRef();
+    const screenStreamRef = useRef(); // Track screen share stream for cleanup
     const candidateQueue = useRef([]);
     const callStartTime = useRef(null);
-    const durationInterval = useRef(null);
 
     // Cleanup function
-    const cleanup = () => {
-        console.log("Cleaning up resources");
-
-        if (durationInterval.current) {
-            clearInterval(durationInterval.current);
-            durationInterval.current = null;
-        }
+    const cleanup = useCallback(() => {
+        logger.log("Cleaning up resources");
 
         if (connectionRef.current) {
             connectionRef.current.close();
@@ -47,17 +43,25 @@ export const useDirectCall = ({
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => {
                 track.stop();
-                console.log(`Stopped ${track.kind} track`);
+                logger.log(`Stopped ${track.kind} track`);
             });
             streamRef.current = null;
         }
 
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(track => {
+                track.stop();
+                logger.log(`Stopped screen share track`);
+            });
+            screenStreamRef.current = null;
+        }
+
         setStream(null);
         setRemoteStream(null);
-    };
+    }, []);
 
     // Get media function
-    const getMedia = async () => {
+    const getMedia = useCallback(async () => {
         setMediaError(null);
         try {
             const constraints = {
@@ -74,7 +78,7 @@ export const useDirectCall = ({
 
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
 
-            console.log("Media stream obtained");
+            logger.log("Media stream obtained");
             setStream(currentStream);
             streamRef.current = currentStream;
 
@@ -84,7 +88,7 @@ export const useDirectCall = ({
 
             return currentStream;
         } catch (err) {
-            console.error("Error accessing media devices:", err);
+            logger.error("Error accessing media devices:", err);
             setMediaError(
                 err.name === 'NotReadableError'
                     ? "Microphone (or Camera) is in use by another app."
@@ -92,26 +96,26 @@ export const useDirectCall = ({
                         ? "Please allow microphone (and camera) access."
                         : "Could not access media devices. Please check your device."
             );
-            throw err;
+            // Don't throw, just let the UI handle the error state
+            return null;
         }
-    };
+    }, [isVideoCall]);
 
     // Process queued ICE candidates
-    const processCandidateQueue = () => {
+    const processCandidateQueue = useCallback(() => {
         const peer = connectionRef.current;
         if (!peer || !peer.remoteDescription) return;
 
-        console.log(`Processing ${candidateQueue.current.length} queued candidates`);
+        logger.log(`Processing ${candidateQueue.current.length} queued candidates`);
         while (candidateQueue.current.length > 0) {
             const candidate = candidateQueue.current.shift();
             peer.addIceCandidate(candidate)
                 .catch(e => console.error("Error processing queued candidate:", e));
         }
-    };
+    }, []);
 
-    // Create peer connection
-    const createPeerConnection = (mediaStream) => {
-        console.log("Creating new peer connection");
+    const createPeerConnection = useCallback((mediaStream) => {
+        logger.log("Creating new peer connection");
 
         const peer = new RTCPeerConnection({
             iceServers: [
@@ -126,14 +130,16 @@ export const useDirectCall = ({
         connectionRef.current = peer;
 
         // Add local tracks
-        mediaStream.getTracks().forEach(track => {
-            console.log(`Adding ${track.kind} track to peer connection`);
-            peer.addTrack(track, mediaStream);
-        });
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => {
+                logger.log(`Adding ${track.kind} track to peer connection`);
+                peer.addTrack(track, mediaStream);
+            });
+        }
 
         // Handle remote stream
         peer.ontrack = (event) => {
-            console.log("Received remote track:", event.streams[0]);
+            logger.log("Received remote track:", event.streams[0]);
             setRemoteStream(event.streams[0]);
             if (userVideo.current && event.streams[0]) {
                 userVideo.current.srcObject = event.streams[0];
@@ -142,8 +148,8 @@ export const useDirectCall = ({
 
         // Handle ICE candidates
         peer.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log("Sending ICE candidate");
+            if (event.candidate && socketRef.current?.connected) {
+                logger.log("Sending ICE candidate");
                 socketRef.current.emit("ice-candidate", {
                     to: isIncoming ? callerId : userToCall,
                     candidate: event.candidate
@@ -153,30 +159,28 @@ export const useDirectCall = ({
 
         // Handle connection state changes
         peer.onconnectionstatechange = () => {
-            console.log("Connection state:", peer.connectionState);
+            logger.log("Connection state:", peer.connectionState);
             setConnectionState(peer.connectionState);
 
             if (peer.connectionState === 'connected') {
-                console.log("Peer connection established!");
+                logger.log("Peer connection established!");
                 if (!callStartTime.current) {
-                    callStartTime.current = Date.now();
-                    durationInterval.current = setInterval(() => {
-                        const elapsed = Math.floor((Date.now() - callStartTime.current) / 1000);
-                        setCallDuration(elapsed);
-                    }, 1000);
+                    const start = Date.now();
+                    callStartTime.current = start;
+                    setStartTime(start);
                 }
             } else if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
-                console.log("Connection failed or disconnected");
+                logger.log("Connection failed or disconnected");
                 setConnectionState('failed');
             }
         };
 
         peer.oniceconnectionstatechange = () => {
-            console.log("ICE connection state:", peer.iceConnectionState);
+            logger.log("ICE connection state:", peer.iceConnectionState);
         };
 
         return peer;
-    };
+    }, [isIncoming, callerId, userToCall, socketRef]);
 
     // Initialize media and socket listeners
     useEffect(() => {
@@ -186,148 +190,167 @@ export const useDirectCall = ({
             try {
                 const mediaStream = await getMedia();
 
+                // Even if media fails, we might still want to proceed with call logic (e.g. audio only or listen only)
+                // But for now, if media fails, getMedia returns null and sets error.
+                if (!mediaStream && !mounted) return;
+
                 if (!mounted) {
-                    mediaStream.getTracks().forEach(track => track.stop());
+                    if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
                     return;
                 }
 
                 const socket = socketRef.current;
+                if (!socket) return;
 
                 // Socket event listeners
-                socket.on("callAccepted", async (signal) => {
-                    console.log("Call accepted, setting remote description");
+                const handleCallAccepted = async (signal) => {
+                    logger.log("Call accepted, setting remote description");
                     setCallAccepted(true);
                     const peer = connectionRef.current;
 
                     if (peer && signal) {
                         try {
                             await peer.setRemoteDescription(new RTCSessionDescription(signal));
-                            console.log("Remote description set, processing candidates");
+                            logger.log("Remote description set, processing candidates");
                             processCandidateQueue();
                         } catch (e) {
-                            console.error("Error setting remote description:", e);
+                            logger.error("Error setting remote description:", e);
                         }
                     }
-                });
+                };
 
-                socket.on("callEnded", () => {
-                    console.log("Call ended by remote peer");
+                const handleCallEnded = () => {
+                    logger.log("Call ended by remote peer");
                     if (mounted) {
                         setCallEnded(true);
                         cleanup();
                         if (onEndCall) onEndCall();
                     }
-                });
+                };
 
-                socket.on("ice-candidate", (candidate) => {
-                    console.log("Received ICE candidate");
+                const handleIceCandidate = (candidate) => {
+                    logger.log("Received ICE candidate");
                     const peer = connectionRef.current;
 
                     if (peer) {
                         const iceCandidate = new RTCIceCandidate(candidate);
 
                         if (peer.remoteDescription && peer.remoteDescription.type) {
-                            console.log("Adding ICE candidate immediately");
+                            logger.log("Adding ICE candidate immediately");
                             peer.addIceCandidate(iceCandidate)
-                                .catch(e => console.error("Error adding ICE candidate:", e));
+                                .catch(e => logger.error("Error adding ICE candidate:", e));
                         } else {
-                            console.log("Queueing ICE candidate");
+                            logger.log("Queueing ICE candidate");
                             candidateQueue.current.push(iceCandidate);
                         }
                     }
-                });
+                };
 
-                // Create peer connection after media is ready
-                const peer = createPeerConnection(mediaStream);
+                socket.on("callAccepted", handleCallAccepted);
+                socket.on("callEnded", handleCallEnded);
+                socket.on("ice-candidate", handleIceCandidate);
 
-                // If outgoing call, create and send offer
-                if (!isIncoming && userToCall) {
-                    console.log("Creating offer for outgoing call");
-                    try {
-                        const offer = await peer.createOffer({
-                            offerToReceiveAudio: true,
-                            offerToReceiveVideo: true
-                        });
-                        await peer.setLocalDescription(offer);
+                // Create peer connection after media is ready (or attempting to)
+                // Pass mediaStream only if it exists
+                if (mediaStream) {
+                    const peer = createPeerConnection(mediaStream);
 
-                        console.log("Sending offer to", userToCall);
-                        socket.emit("callUser", {
-                            userToCall: userToCall,
-                            signalData: peer.localDescription,
-                            from: user._id || user.id,
-                            name: user.name,
-                            isVideo: isVideoCall // Pass isVideo flag
-                        });
-                    } catch (err) {
-                        console.error("Error creating offer:", err);
-                        setMediaError("Failed to initiate call. Please try again.");
+                    // If outgoing call, create and send offer
+                    if (!isIncoming && userToCall) {
+                        logger.log("Creating offer for outgoing call");
+                        try {
+                            const offer = await peer.createOffer({
+                                offerToReceiveAudio: true,
+                                offerToReceiveVideo: true
+                            });
+                            await peer.setLocalDescription(offer);
+
+                            logger.log("Sending offer to", userToCall);
+                            socket.emit("callUser", {
+                                userToCall: userToCall,
+                                signalData: peer.localDescription,
+                                from: user?._id || user?.id,
+                                name: user?.name,
+                                isVideo: isVideoCall
+                            });
+                        } catch (err) {
+                            logger.error("Error creating offer:", err);
+                            setMediaError("Failed to initiate call. Please try again.");
+                        }
                     }
                 }
+
+                // Store cleanup for these specific listeners
+                return () => {
+                    socket.off("callAccepted", handleCallAccepted);
+                    socket.off("callEnded", handleCallEnded);
+                    socket.off("ice-candidate", handleIceCandidate);
+                };
+
             } catch (err) {
-                console.error("Failed to initialize call:", err);
+                logger.error("Failed to initialize call:", err);
             }
         };
 
-        initializeCall();
+        const cleanupListeners = initializeCall();
 
         return () => {
             mounted = false;
-            const socket = socketRef.current;
-            if (socket) {
-                socket.off("callAccepted");
-                socket.off("callEnded");
-                socket.off("ice-candidate");
-            }
+            cleanupListeners.then(cleanupFn => cleanupFn && cleanupFn());
             cleanup();
         };
-    }, []);
+    }, [getMedia, createPeerConnection, cleanup, isIncoming, userToCall, isVideoCall, user, socketRef, onEndCall]);
 
     // Answer incoming call
     const answerCall = async () => {
-        console.log("Answering call");
+        logger.log("Answering call");
         setCallAccepted(true);
-        if (onAnswer) onAnswer(); // Trigger context update for ringtone
+        if (onAnswer) onAnswer();
         const peer = connectionRef.current;
 
         if (!peer) {
-            console.error("No peer connection available");
+            logger.error("No peer connection available");
             return;
         }
 
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(callerSignal));
-            console.log("Remote offer set, processing candidates");
+            logger.log("Remote offer set, processing candidates");
             processCandidateQueue();
 
             const answer = await peer.createAnswer();
             await peer.setLocalDescription(answer);
 
-            console.log("Sending answer to", callerId);
-            socketRef.current.emit("answerCall", {
-                signal: peer.localDescription,
-                to: callerId
-            });
+            logger.log("Sending answer to", callerId);
+            if (socketRef.current?.connected) {
+                socketRef.current.emit("answerCall", {
+                    signal: peer.localDescription,
+                    to: callerId
+                });
+            }
         } catch (e) {
-            console.error("Error answering call:", e);
+            logger.error("Error answering call:", e);
             setMediaError("Failed to answer call. Please try again.");
         }
     };
 
     // Leave call
-    const leaveCall = () => {
-        console.log("Leaving call");
+    const leaveCall = useCallback(() => {
+        logger.log("Leaving call");
         setCallEnded(true);
         cleanup();
 
-        socketRef.current.emit("endCall", {
-            to: isIncoming ? callerId : userToCall
-        });
+        if (socketRef.current?.connected) {
+            socketRef.current.emit("endCall", {
+                to: isIncoming ? callerId : userToCall
+            });
+        }
 
         if (onEndCall) onEndCall();
-    };
+    }, [cleanup, isIncoming, callerId, userToCall, socketRef, onEndCall]);
 
     // Toggle mute
-    const toggleMute = () => {
+    const toggleMute = useCallback(() => {
         if (streamRef.current) {
             const audioTrack = streamRef.current.getAudioTracks()[0];
             if (audioTrack) {
@@ -335,10 +358,10 @@ export const useDirectCall = ({
                 setIsMuted(!audioTrack.enabled);
             }
         }
-    };
+    }, []);
 
     // Toggle video
-    const toggleVideo = () => {
+    const toggleVideo = useCallback(() => {
         if (streamRef.current) {
             const videoTrack = streamRef.current.getVideoTracks()[0];
             if (videoTrack) {
@@ -346,7 +369,7 @@ export const useDirectCall = ({
                 setIsVideoOff(!videoTrack.enabled);
             }
         }
-    };
+    }, []);
 
     // Toggle screen sharing
     const toggleScreenShare = async () => {
@@ -357,35 +380,47 @@ export const useDirectCall = ({
                     audio: false
                 });
 
+                screenStreamRef.current = screenStream; // Store for cleanup
+
                 const screenTrack = screenStream.getVideoTracks()[0];
                 const peer = connectionRef.current;
+                const videoTrack = streamRef.current?.getVideoTracks()[0];
 
-                if (peer) {
+                if (peer && screenTrack) {
                     const sender = peer.getSenders().find(s => s.track?.kind === 'video');
                     if (sender) {
                         sender.replaceTrack(screenTrack);
                     }
                 }
 
-                // When screen sharing stops
+                // When screen sharing stops (user clicks 'Stop sharing' in browser UI)
                 screenTrack.onended = () => {
-                    const videoTrack = streamRef.current?.getVideoTracks()[0];
-                    if (videoTrack && peer) {
-                        const sender = peer.getSenders().find(s => s.track?.kind === 'video');
+                    const currentVideoTrack = streamRef.current?.getVideoTracks()[0];
+                    const currentPeer = connectionRef.current;
+
+                    if (currentVideoTrack && currentPeer) {
+                        const sender = currentPeer.getSenders().find(s => s.track?.kind === 'video');
                         if (sender) {
-                            sender.replaceTrack(videoTrack);
+                            sender.replaceTrack(currentVideoTrack);
                         }
                     }
                     setIsScreenSharing(false);
+                    screenStreamRef.current = null;
                 };
 
                 setIsScreenSharing(true);
             } catch (err) {
-                console.error("Error sharing screen:", err);
+                logger.error("Error sharing screen:", err);
             }
         } else {
+            // Manually stop screen sharing
             const videoTrack = streamRef.current?.getVideoTracks()[0];
             const peer = connectionRef.current;
+
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach(track => track.stop());
+                screenStreamRef.current = null;
+            }
 
             if (videoTrack && peer) {
                 const sender = peer.getSenders().find(s => s.track?.kind === 'video');
@@ -407,7 +442,7 @@ export const useDirectCall = ({
         isScreenSharing,
         mediaError,
         connectionState,
-        callDuration,
+        startTime,
         myVideoRef: myVideo,
         userVideoRef: userVideo,
         answerCall,

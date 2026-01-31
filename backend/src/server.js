@@ -12,6 +12,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import passwordRoutes from './routes/passwordRoutes.js';
 
 import chatRoutes from './routes/chatRoutes.js';
+import { apiRateLimit } from './middleware/rateLimiter.js';
 import fs from 'fs';
 
 dotenv.config();
@@ -31,7 +32,8 @@ try {
 }
 
 if (!process.env.JWT_SECRET) {
-  console.warn('WARNING: JWT_SECRET is not defined in .env. Auth will fail.');
+  console.error('FATAL ERROR: JWT_SECRET is not defined in .env. Authentication system cannot function.');
+  process.exit(1);
 }
 
 import http from 'http';
@@ -43,7 +45,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: process.env.CLIENT_URL || '*',
     methods: ['GET', 'POST']
   }
 });
@@ -61,6 +63,9 @@ app.use(express.json());
 
 // Initialize Socket Logic
 setupSocket(io);
+
+// Apply rate limiting to all API routes
+app.use('/api/', apiRateLimit);
 
 // Routes
 app.use('/api/auth', authRoutes);

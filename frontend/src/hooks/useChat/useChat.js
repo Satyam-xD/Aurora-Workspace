@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useChatContext } from '../../context/ChatContext';
+import { validateFile } from '../../utils/fileValidation';
+import { toast } from 'sonner';
 
 export const useChat = () => {
     const { user } = useAuth();
@@ -48,11 +50,14 @@ export const useChat = () => {
     }, [activeChat, socketRef]);
 
     // 2. Fetch History on Chat Switch
+    // 2. Fetch History on Chat Switch
     useEffect(() => {
         if (!activeChat || !user) return;
 
         // Only fetch if not already cached
         if (fetchedChats.has(activeChat)) return;
+
+        let mounted = true;
 
         const fetchHistory = async () => {
             setIsLoadingHistory(true);
@@ -65,7 +70,7 @@ export const useChat = () => {
                 });
                 const responseData = await res.json();
 
-                if (res.ok) {
+                if (res.ok && mounted) {
                     const messagesArray = responseData.messages || responseData;
                     const formattedMessages = messagesArray.map(msg => ({
                         id: msg._id,
@@ -92,12 +97,16 @@ export const useChat = () => {
             } catch (err) {
                 console.error("Failed to fetch chat history", err);
             } finally {
-                setIsLoadingHistory(false);
+                if (mounted) setIsLoadingHistory(false);
             }
         };
 
         fetchHistory();
-    }, [activeChat, user, fetchedChats, setChatsData, setFetchedChats, setIsLoadingHistory]);
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeChat, user, fetchedChats]); // Removed stable setters from dependencies
 
     const handleSend = async (msgType = 'text', msgContent = message) => {
         if ((msgContent.trim() || msgType === 'image') && user && activeChat) {
@@ -177,6 +186,14 @@ export const useChat = () => {
 
     const handleFileUpload = async (file) => {
         if (!file) return;
+
+        // Validate file
+        const validation = validateFile(file);
+        if (!validation.valid) {
+            toast.error(validation.error);
+            return;
+        }
+
         setIsUploadingFile(true);
         try {
             const formData = new FormData();
@@ -198,6 +215,7 @@ export const useChat = () => {
             }
         } catch (err) {
             console.error("Upload failed", err);
+            toast.error("Failed to upload file. Please try again.");
         } finally {
             setIsUploadingFile(false);
         }
@@ -220,6 +238,15 @@ export const useChat = () => {
 
         setTypingTimer(timer);
     };
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (typingTimer) {
+                clearTimeout(typingTimer);
+            }
+        };
+    }, [typingTimer]);
 
     const handleCreateGroup = async (groupName) => {
         try {
