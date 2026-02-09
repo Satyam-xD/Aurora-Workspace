@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Task from '../models/Task.js';
 import Team from '../models/Team.js';
 import Activity from '../models/Activity.js';
+import { createNotifications } from '../utils/notificationService.js';
 
 // Helper to get stats properly
 // Helper to get stats properly
@@ -215,6 +216,22 @@ const addTeamMember = asyncHandler(async (req, res) => {
     targetTeam.members.push(userToAdd._id);
     await targetTeam.save();
 
+    // Trigger Notification for the team
+    const io = req.app.get('socketio');
+    const recipientIds = [...targetTeam.members, targetTeam.owner]
+        .map(id => id.toString())
+        .filter(id => id !== req.user._id.toString()); // Don't notify the one who added
+
+    if (recipientIds.length > 0) {
+        await createNotifications(recipientIds, {
+            title: 'New Team Member',
+            description: `${userToAdd.name} has joined the team "${targetTeam.name}"`,
+            type: 'team_update',
+            sender: req.user._id,
+            link: '/team'
+        }, io);
+    }
+
     // Log Activity
     await Activity.create({
         teamOwner: req.user._id,
@@ -265,6 +282,22 @@ const removeTeamMember = asyncHandler(async (req, res) => {
 
     team.members = team.members.filter(id => id.toString() !== memberId);
     await team.save();
+
+    // Trigger Notification for the remaining team
+    const io = req.app.get('socketio');
+    const recipientIds = [...team.members, team.owner]
+        .map(id => id.toString())
+        .filter(id => id !== req.user._id.toString());
+
+    if (recipientIds.length > 0) {
+        await createNotifications(recipientIds, {
+            title: 'Team Update',
+            description: `A member was removed from the team "${team.name}"`,
+            type: 'team_update',
+            sender: req.user._id,
+            link: '/team'
+        }, io);
+    }
 
     await Activity.create({
         teamOwner: req.user._id,

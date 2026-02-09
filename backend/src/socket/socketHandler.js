@@ -9,6 +9,7 @@ export const setupSocket = (io) => {
     const videoRooms = new Map(); // roomId -> Map of { userId, userName, socketId }
 
     io.on('connection', (socket) => {
+        console.log(`Socket Connected: ${socket.id}`);
         socket.emit("me", socket.id);
 
         socket.on("setup", (userData) => {

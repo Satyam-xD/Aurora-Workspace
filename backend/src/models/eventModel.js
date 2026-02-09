@@ -8,6 +8,7 @@ const eventSchema = mongoose.Schema(
         end: { type: Date, required: true },
         allDay: { type: Boolean, default: false },
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
         description: { type: String },
         color: { type: String, default: '#3b82f6' }, // Default blue
     },

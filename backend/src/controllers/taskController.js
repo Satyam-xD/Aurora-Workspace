@@ -3,6 +3,8 @@ import Task from '../models/Task.js';
 import Team from '../models/Team.js';
 import Activity from '../models/Activity.js';
 
+import { createNotifications, createNotification } from '../utils/notificationService.js';
+
 // @desc    Get tasks (Visible to everyone in the team)
 // @route   GET /api/tasks
 // @access  Private
@@ -105,6 +107,18 @@ const setTask = asyncHandler(async (req, res) => {
     });
 
     const populatedTask = await Task.findById(task._id).populate('assignedTo', 'name email');
+
+    // Notify assigned user
+    if (task.assignedTo) {
+        await createNotification(task.assignedTo, {
+            sender: req.user.id,
+            title: 'New Task Assigned',
+            description: `You have been assigned to task: "${task.title}"`,
+            type: 'task_assigned',
+            link: '/kanban'
+        }, req.app.get('socketio'));
+    }
+
     res.status(200).json(populatedTask);
 });
 
@@ -187,6 +201,24 @@ const updateTask = asyncHandler(async (req, res) => {
             .populate('assignedTo', 'name email')
             .populate('completedBy', 'name email')
             .populate('lastModifiedBy', 'name email');
+
+        // Notify team or assigned user about update
+        if (team && req.body.status && req.body.status !== task.status) {
+            const teamMemberIds = team.members
+                .filter(id => id.toString() !== req.user.id)
+                .map(id => id.toString());
+
+            if (teamMemberIds.length > 0) {
+                await createNotifications(teamMemberIds, {
+                    sender: req.user.id,
+                    title: 'Task Updated',
+                    description: `${req.user.name} updated task "${task.title}" to ${req.body.status}`,
+                    type: 'task_updated',
+                    link: '/kanban'
+                }, req.app.get('socketio'));
+            }
+        }
+
         return res.status(200).json(updatedTask);
     }
 
@@ -243,6 +275,24 @@ const updateTask = asyncHandler(async (req, res) => {
             .populate('assignedTo', 'name email')
             .populate('completedBy', 'name email')
             .populate('lastModifiedBy', 'name email');
+
+        // Notify team about status change by member
+        if (team && status !== task.status) {
+            const teamMemberIds = [...team.members, team.owner]
+                .filter(id => id.toString() !== req.user.id)
+                .map(id => id.toString());
+
+            if (teamMemberIds.length > 0) {
+                await createNotifications(teamMemberIds, {
+                    sender: req.user.id,
+                    title: 'Task Status Updated',
+                    description: `${req.user.name} moved task "${task.title}" to ${status}`,
+                    type: 'task_updated',
+                    link: '/kanban'
+                }, req.app.get('socketio'));
+            }
+        }
+
         return res.status(200).json(updatedTask);
     }
 

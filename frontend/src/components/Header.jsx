@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Video, MessageCircle, FileText, Home, Bell, Search, Menu, X, LogOut, Lock, Sun, Moon, Kanban, LogIn, Users, Shield, ChevronDown, Settings, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../hooks/useNotifications/useNotifications';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
@@ -10,6 +11,7 @@ const Header = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { unreadCount } = useNotifications();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef(null);
@@ -149,7 +151,11 @@ const Header = () => {
                     }`}
                 >
                   <Bell size={20} />
-                  <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-gray-900"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2 right-2.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full ring-2 ring-white dark:ring-gray-900 animate-pulse">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
 
                 {/* Theme Toggle */}

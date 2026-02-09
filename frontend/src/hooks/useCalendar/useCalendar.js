@@ -35,7 +35,7 @@ export const useCalendar = () => {
         }
     }, [user.token]);
 
-    const createEvent = async (eventData) => {
+    const createEvent = async (eventData, teamId = null) => {
         try {
             const res = await fetch('/api/events', {
                 method: 'POST',
@@ -43,7 +43,7 @@ export const useCalendar = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${user.token}`
                 },
-                body: JSON.stringify(eventData)
+                body: JSON.stringify({ ...eventData, teamId })
             });
 
             if (res.ok) {

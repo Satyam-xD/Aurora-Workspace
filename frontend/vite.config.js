@@ -23,6 +23,7 @@ export default defineConfig({
       '/socket.io': {
         target: 'http://localhost:4001',
         ws: true,
+        changeOrigin: true,
       },
     },
   },

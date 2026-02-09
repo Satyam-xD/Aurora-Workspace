@@ -1,12 +1,92 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useChatContext } from '../../context/ChatContext';
-import { MessageCircle, Video, FileText, UserPlus, Calendar, CheckSquare, Clock, AlertCircle } from 'lucide-react';
+import { MessageCircle, Video, FileText, UserPlus, Calendar, CheckSquare, Clock, AlertCircle, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const typeIcons = {
+    'task_assigned': CheckSquare,
+    'task_updated': CheckSquare,
+    'event_created': Calendar,
+    'event_reminder': Clock,
+    'document_shared': FileText,
+    'team_update': UserPlus,
+    'message': MessageCircle,
+    'deadline': AlertCircle
+};
+
+const typeColors = {
+    'task_assigned': 'bg-emerald-500',
+    'task_updated': 'bg-blue-500',
+    'event_created': 'bg-purple-500',
+    'event_reminder': 'bg-red-500',
+    'document_shared': 'bg-indigo-500',
+    'team_update': 'bg-fuchsia-500',
+    'message': 'bg-blue-500',
+    'deadline': 'bg-amber-500'
+};
 
 export const useNotifications = () => {
     const [filter, setFilter] = useState('all');
-    const { chatsData, setActiveChat } = useChatContext();
+    const [dbNotifications, setDbNotifications] = useState([]);
+    const { chatsData, setActiveChat, socketRef, user } = useChatContext();
     const navigate = useNavigate();
+
+    // Fetch notifications from API
+    const fetchNotifications = useCallback(async () => {
+        const token = user?.token || JSON.parse(localStorage.getItem('user'))?.token;
+        if (!token) return;
+
+        try {
+            const res = await fetch('/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setDbNotifications(data.map(n => ({
+                    ...n,
+                    id: n._id,
+                    icon: typeIcons[n.type] || Bell,
+                    color: typeColors[n.type] || 'bg-gray-500',
+                    time: new Date(n.createdAt).toLocaleString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                })));
+            }
+        } catch (err) {
+            console.error("Failed to fetch notifications", err);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        fetchNotifications();
+    }, [fetchNotifications]);
+
+    // Handle real-time notifications via socket
+    useEffect(() => {
+        if (!socketRef.current) return;
+
+        const handleNewNotification = (notification) => {
+            const formattedNotif = {
+                ...notification,
+                id: notification._id,
+                icon: typeIcons[notification.type] || Bell,
+                color: typeColors[notification.type] || 'bg-gray-500',
+                time: 'Just now'
+            };
+            setDbNotifications(prev => [formattedNotif, ...prev]);
+        };
+
+        socketRef.current.on('newNotification', handleNewNotification);
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.off('newNotification', handleNewNotification);
+            }
+        };
+    }, [socketRef]);
 
     // Generate notifications from unread chats
     const chatNotifications = useMemo(() => {
@@ -30,126 +110,71 @@ export const useNotifications = () => {
             });
     }, [chatsData]);
 
-    const [mockNotifications, setMockNotifications] = useState([
-        {
-            id: 1,
-            type: 'message',
-            title: 'New message from Satyam',
-            description: 'Hey! Can we schedule a meeting for tomorrow?',
-            time: '5m ago',
-            read: false,
-            icon: MessageCircle,
-            color: 'bg-blue-500'
-        },
-        {
-            id: 2,
-            type: 'video',
-            title: 'Video call invitation',
-            description: 'Prachi invited you to join "Weekly Sync"',
-            time: '15m ago',
-            read: false,
-            icon: Video,
-            color: 'bg-fuchsia-500'
-        },
-        {
-            id: 3,
-            type: 'document',
-            title: 'Document shared',
-            description: 'Sneha shared "Project_Plan.pdf"',
-            time: '1h ago',
-            read: true,
-            icon: FileText,
-            color: 'bg-purple-500'
-        },
-        {
-            id: 4,
-            type: 'user',
-            title: 'New team member',
-            description: 'Parkhi joined your workspace',
-            time: '2h ago',
-            read: true,
-            icon: UserPlus,
-            color: 'bg-indigo-500'
-        },
-        {
-            id: 5,
-            type: 'calendar',
-            title: 'Meeting reminder',
-            description: 'Team standup in 30 minutes',
-            time: '3h ago',
-            read: false,
-            icon: Calendar,
-            color: 'bg-red-500'
-        }
-    ]);
-
-    // Simulate real-time updates
-    useEffect(() => {
-        // Simulate a new task being assigned after 5 seconds
-        const taskTimer = setTimeout(() => {
-            const newTaskNotification = {
-                id: Date.now(),
-                type: 'task',
-                title: 'New Task Assigned',
-                description: 'You have been assigned to "Frontend Architecture"',
-                time: 'Just now',
-                read: false,
-                icon: CheckSquare,
-                color: 'bg-emerald-500'
-            };
-            setMockNotifications(prev => [newTaskNotification, ...prev]);
-        }, 5000);
-
-        // Simulate a deadline approaching after 10 seconds
-        const deadlineTimer = setTimeout(() => {
-            const deadlineNotification = {
-                id: Date.now() + 1,
-                type: 'deadline',
-                title: 'Deadline Approaching',
-                description: 'Task "Design System" is due in 2 hours',
-                time: 'Just now',
-                read: false,
-                icon: AlertCircle,
-                color: 'bg-amber-500'
-            };
-            setMockNotifications(prev => [deadlineNotification, ...prev]);
-        }, 12000);
-
-        return () => {
-            clearTimeout(taskTimer);
-            clearTimeout(deadlineTimer);
-        };
-    }, []);
-
-
-    // Combine mock and real chat notifications
+    // Combine database and chat notifications
     const notifications = useMemo(() => {
-        // Sort by time (approximated) - putting unread chat messages at the top usually
-        return [...chatNotifications, ...mockNotifications];
-    }, [chatNotifications, mockNotifications]);
+        return [...chatNotifications, ...dbNotifications].sort((a, b) => {
+            const timeA = a.fullTime || a.createdAt || new Date();
+            const timeB = b.fullTime || b.createdAt || new Date();
+            return new Date(timeB) - new Date(timeA);
+        });
+    }, [chatNotifications, dbNotifications]);
 
-    const markAsRead = (id) => {
+    const markAsRead = async (id) => {
         if (typeof id === 'string' && id.startsWith('chat-')) {
             const chatId = id.replace('chat-', '');
             setActiveChat(chatId);
             navigate('/chat');
             return;
         }
-        setMockNotifications(mockNotifications.map(notif =>
-            notif.id === id ? { ...notif, read: true } : notif
-        ));
+
+        const token = user?.token || JSON.parse(localStorage.getItem('user'))?.token;
+        try {
+            const res = await fetch(`/api/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setDbNotifications(prev => prev.map(n =>
+                    n.id === id ? { ...n, read: true } : n
+                ));
+            }
+        } catch (err) {
+            console.error("Failed to mark notification as read", err);
+        }
     };
 
-    const markAllAsRead = () => {
-        setMockNotifications(mockNotifications.map(notif => ({ ...notif, read: true })));
+    const markAllAsRead = async () => {
+        const token = user?.token || JSON.parse(localStorage.getItem('user'))?.token;
+        try {
+            const res = await fetch('/api/notifications/read-all', {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setDbNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            }
+        } catch (err) {
+            console.error("Failed to mark all as read", err);
+        }
     };
 
-    const deleteNotification = (id) => {
+    const deleteNotification = async (id) => {
         if (typeof id === 'string' && id.startsWith('chat-')) {
-            // Cannot delete chat notification easily, maybe just ignore
             return;
         }
-        setMockNotifications(mockNotifications.filter(notif => notif.id !== id));
+
+        const token = user?.token || JSON.parse(localStorage.getItem('user'))?.token;
+        try {
+            const res = await fetch(`/api/notifications/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setDbNotifications(prev => prev.filter(n => n.id !== id));
+            }
+        } catch (err) {
+            console.error("Failed to delete notification", err);
+        }
     };
 
     const filteredNotifications = useMemo(() => {

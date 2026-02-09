@@ -1,12 +1,29 @@
 
 import asyncHandler from 'express-async-handler';
 import Event from '../models/eventModel.js';
+import Team from '../models/Team.js';
+import { createNotifications } from '../utils/notificationService.js';
 
 // @desc    Get all events for a user
 // @route   GET /api/events
 // @access  Private
 const getEvents = asyncHandler(async (req, res) => {
-    const events = await Event.find({ user: req.user._id });
+    // Find teams where user is owner or member
+    const teams = await Team.find({
+        $or: [
+            { owner: req.user._id },
+            { members: req.user._id }
+        ]
+    });
+    const teamIds = teams.map(t => t._id);
+
+    const events = await Event.find({
+        $or: [
+            { user: req.user._id },
+            { team: { $in: teamIds } }
+        ]
+    }).sort({ start: 1 });
+
     res.json(events);
 });
 
@@ -14,7 +31,7 @@ const getEvents = asyncHandler(async (req, res) => {
 // @route   POST /api/events
 // @access  Private
 const createEvent = asyncHandler(async (req, res) => {
-    const { title, start, end, allDay, description, color } = req.body;
+    const { title, start, end, allDay, description, color, teamId } = req.body;
 
     if (!title || !start || !end) {
         res.status(400);
@@ -23,6 +40,7 @@ const createEvent = asyncHandler(async (req, res) => {
 
     const event = await Event.create({
         user: req.user._id,
+        team: teamId || null,
         title,
         start,
         end,
@@ -30,6 +48,26 @@ const createEvent = asyncHandler(async (req, res) => {
         description,
         color,
     });
+
+    // Notify team members if teamId is provided
+    if (teamId) {
+        const team = await Team.findById(teamId);
+        if (team) {
+            const recipientIds = [...team.members, team.owner].filter(
+                id => id.toString() !== req.user.id
+            ).map(id => id.toString());
+
+            if (recipientIds.length > 0) {
+                await createNotifications(recipientIds, {
+                    sender: req.user.id,
+                    title: 'New Event Scheduled',
+                    description: `A new event "${title}" has been scheduled for ${new Date(start).toLocaleDateString()}`,
+                    type: 'event_created',
+                    link: '/calendar'
+                }, req.app.get('socketio'));
+            }
+        }
+    }
 
     res.status(201).json(event);
 });

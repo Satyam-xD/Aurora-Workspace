@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import Document from '../models/Document.js';
 import Folder from '../models/Folder.js';
 import Team from '../models/Team.js';
+import { createNotifications } from '../utils/notificationService.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -108,6 +109,22 @@ const uploadDocument = asyncHandler(async (req, res) => {
             size: (req.file.size / (1024 * 1024)).toFixed(2) + ' MB',
             url: `/uploads/${req.file.filename}`, // Relative URL
         });
+
+        // Trigger Notification for the team
+        const io = req.app.get('socketio');
+        const recipientIds = [...team.members, team.owner]
+            .map(id => id.toString())
+            .filter(id => id !== req.user.id.toString());
+
+        if (recipientIds.length > 0) {
+            await createNotifications(recipientIds, {
+                title: 'New Document Uploaded',
+                description: `"${document.name}" has been uploaded to the team library`,
+                type: 'document_shared',
+                sender: req.user.id,
+                link: '/documents'
+            }, io);
+        }
 
         // Return full doc with populated user
         const populatedDoc = await Document.findById(document._id).populate('uploadedBy', 'name');
