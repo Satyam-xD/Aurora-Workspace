@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
-import { Users, Clock, Zap, Video, Plus, Calendar, ArrowRight, Sparkles, TrendingUp } from 'lucide-react';
+import {
+    Users, Clock, Zap, Video, Plus, Calendar, ArrowRight, Sparkles, TrendingUp,
+    CheckCircle, ListTodo, FileText, Shield, BarChart3, Target, AlertTriangle
+} from 'lucide-react';
 import { APP_FEATURES } from '../constants';
 import { motion } from 'framer-motion';
+import { DashboardSkeleton } from '../components/SkeletonLoader';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -16,10 +20,9 @@ const Dashboard = () => {
         // Fetch Teams
         const teamRes = await fetch('/api/team', { headers });
         const teams = await teamRes.json();
-
         if (!teamRes.ok) throw new Error('Failed to fetch teams');
 
-        let dashboardData = { teamMembers: [], activities: [] };
+        let dashboardData = { teamMembers: [], activities: [], tasks: [], events: [], documents: [] };
 
         if (teams.length > 0) {
             const primaryTeam = teams[0];
@@ -28,11 +31,38 @@ const Dashboard = () => {
             // Fetch Activities
             const activityRes = await fetch(`/api/team/activity/${primaryTeam.id}`, { headers });
             const activityData = await activityRes.json();
-
             if (activityRes.ok) {
                 dashboardData.activities = activityData;
             }
         }
+
+        // Fetch Tasks
+        try {
+            const taskRes = await fetch('/api/tasks', { headers });
+            if (taskRes.ok) {
+                dashboardData.tasks = await taskRes.json();
+            }
+        } catch (e) { /* silently fail */ }
+
+        // Fetch Events
+        try {
+            const eventRes = await fetch('/api/events', { headers });
+            if (eventRes.ok) {
+                dashboardData.events = await eventRes.json();
+            }
+        } catch (e) { /* silently fail */ }
+
+        // Fetch Documents (requires teamId)
+        if (teams.length > 0) {
+            try {
+                const docRes = await fetch(`/api/documents?teamId=${teams[0].id || teams[0]._id}`, { headers });
+                if (docRes.ok) {
+                    const docData = await docRes.json();
+                    dashboardData.documents = docData.documents || [];
+                }
+            } catch (e) { /* silently fail */ }
+        }
+
         return dashboardData;
     };
 
@@ -44,9 +74,59 @@ const Dashboard = () => {
 
     const activities = dashboardData?.activities || [];
     const teamMembers = dashboardData?.teamMembers || [];
+    const tasks = dashboardData?.tasks || [];
+    const events = dashboardData?.events || [];
+    const documents = dashboardData?.documents || [];
+
+    // ─── Computed Analytics ──────────────────────────────────────────
+    const analytics = useMemo(() => {
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.status === 'Done').length;
+        const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
+        const todoTasks = tasks.filter(t => t.status === 'To Do').length;
+        const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        const now = new Date();
+        const upcomingEvents = events
+            .filter(e => new Date(e.start || e.date) >= now)
+            .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date))
+            .slice(0, 5);
+
+        const overdueTasks = tasks.filter(t => {
+            if (!t.dueDate || t.status === 'Done') return false;
+            return new Date(t.dueDate) < now;
+        });
+
+        const highPriorityTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'Done');
+
+        // Weekly task completion trend (last 7 days)
+        const weekData = [];
+        for (let i = 6; i >= 0; i--) {
+            const day = new Date();
+            day.setDate(day.getDate() - i);
+            const dayStr = day.toLocaleDateString('en-US', { weekday: 'short' });
+            const count = tasks.filter(t => {
+                if (!t.completedAt) return false;
+                const d = new Date(t.completedAt);
+                return d.toDateString() === day.toDateString();
+            }).length;
+            weekData.push({ day: dayStr, count });
+        }
+        const maxWeekCount = Math.max(...weekData.map(d => d.count), 1);
+
+        return {
+            totalTasks, completedTasks, inProgressTasks, todoTasks, completionRate,
+            upcomingEvents, overdueTasks, highPriorityTasks,
+            totalDocuments: documents.length,
+            totalMembers: teamMembers.length,
+            weekData, maxWeekCount
+        };
+    }, [tasks, events, documents, teamMembers]);
 
     const features = APP_FEATURES;
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    if (isLoading) return <DashboardSkeleton />;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950/30">
@@ -62,7 +142,7 @@ const Dashboard = () => {
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4"
+                    className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4"
                 >
                     <div>
                         <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
@@ -97,8 +177,63 @@ const Dashboard = () => {
                     </div>
                 </motion.div>
 
-                {/* Apps Grid */}
-                <div className="mb-12">
+                {/* ─── Analytics Stats Row ───────────────────────────────────── */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                    {[
+                        {
+                            label: 'Total Tasks',
+                            value: analytics.totalTasks,
+                            sub: `${analytics.completedTasks} completed`,
+                            icon: ListTodo,
+                            color: 'from-blue-500 to-indigo-600',
+                            shadowColor: 'shadow-blue-500/20'
+                        },
+                        {
+                            label: 'Completion',
+                            value: `${analytics.completionRate}%`,
+                            sub: `${analytics.inProgressTasks} in progress`,
+                            icon: Target,
+                            color: 'from-emerald-500 to-teal-600',
+                            shadowColor: 'shadow-emerald-500/20'
+                        },
+                        {
+                            label: 'Documents',
+                            value: analytics.totalDocuments,
+                            sub: 'Files stored',
+                            icon: FileText,
+                            color: 'from-orange-500 to-red-500',
+                            shadowColor: 'shadow-orange-500/20'
+                        },
+                        {
+                            label: 'Team Members',
+                            value: analytics.totalMembers,
+                            sub: 'Active collaborators',
+                            icon: Users,
+                            color: 'from-purple-500 to-pink-600',
+                            shadowColor: 'shadow-purple-500/20'
+                        }
+                    ].map((stat, i) => (
+                        <motion.div
+                            key={stat.label}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.08 }}
+                            className={`bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-lg ${stat.shadowColor} hover:shadow-xl transition-all group`}
+                        >
+                            <div className="flex items-center justify-between mb-3">
+                                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.color} text-white shadow-md group-hover:scale-110 transition-transform`}>
+                                    <stat.icon size={20} strokeWidth={2} />
+                                </div>
+                                <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{stat.label}</span>
+                            </div>
+                            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{stat.value}</p>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{stat.sub}</p>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* ─── Quick Access Grid ─────────────────────────────────────── */}
+                <div className="mb-10">
                     <motion.h2
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -132,86 +267,213 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Recent Activity / Overview Split */}
+                {/* ─── Main Content: Activity + Sidebar ───────────────────────── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left: Activity Feed */}
+                    {/* Left: Activity Feed + Weekly Chart */}
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.4 }}
                         className="lg:col-span-2 space-y-6"
                     >
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                                <TrendingUp size={24} className="text-indigo-500" />
-                                Recent Activity
-                            </h2>
-                            <button className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold">View All</button>
-                        </div>
-                        {activities.length > 0 ? (
-                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
-                                <div className="space-y-4">
-                                    {activities.map((activity, index) => (
+                        {/* Weekly Task Completion Mini Chart */}
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <BarChart3 size={20} className="text-indigo-500" /> Weekly Progress
+                                </h3>
+                                <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Last 7 days</span>
+                            </div>
+                            <div className="flex items-end gap-3 h-32">
+                                {analytics.weekData.map((d, i) => (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{d.count}</span>
                                         <motion.div
-                                            key={index}
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: 0.5 + index * 0.1 }}
-                                            className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0"
-                                        >
-                                            <div className="mt-1 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                                                <Users size={18} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-900 dark:text-white font-medium">
-                                                    <span className="font-black">Team Admin</span> {activity.text}
-                                                </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{new Date(activity.createdAt).toLocaleDateString()} • {new Date(activity.createdAt).toLocaleTimeString()}</p>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg min-h-[300px] flex items-center justify-center text-center">
-                                <div className="space-y-4">
-                                    <div className="mx-auto w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
-                                        <Clock size={32} className="text-indigo-500" />
+                                            initial={{ height: 0 }}
+                                            animate={{ height: `${Math.max((d.count / analytics.maxWeekCount) * 100, 8)}%` }}
+                                            transition={{ delay: 0.5 + i * 0.08, type: 'spring', stiffness: 100 }}
+                                            className={`w-full rounded-xl ${d.count > 0 ? 'bg-gradient-to-t from-indigo-600 to-indigo-400 shadow-md shadow-indigo-500/20' : 'bg-gray-200 dark:bg-gray-700'}`}
+                                        />
+                                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase">{d.day}</span>
                                     </div>
-                                    <div>
-                                        <p className="text-gray-900 dark:text-white font-bold text-lg">All caught up!</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">No new notifications.</p>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Activity Feed */}
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                                    <TrendingUp size={24} className="text-indigo-500" />
+                                    Recent Activity
+                                </h2>
+                                <button className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold">View All</button>
+                            </div>
+                            {activities.length > 0 ? (
+                                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
+                                    <div className="space-y-4">
+                                        {activities.slice(0, 6).map((activity, index) => (
+                                            <motion.div
+                                                key={index}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: 0.5 + index * 0.08 }}
+                                                className="flex items-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0"
+                                            >
+                                                <div className="mt-1 w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                                                    <Users size={18} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-gray-900 dark:text-white font-medium">
+                                                        <span className="font-black">Team Admin</span> {activity.text}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{new Date(activity.createdAt).toLocaleDateString()} • {new Date(activity.createdAt).toLocaleTimeString()}</p>
+                                                </div>
+                                            </motion.div>
+                                        ))}
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg min-h-[200px] flex items-center justify-center text-center">
+                                    <div className="space-y-4">
+                                        <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
+                                            <Clock size={28} className="text-indigo-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-900 dark:text-white font-bold text-lg">All caught up!</p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">No recent activity.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </motion.div>
 
-                    {/* Right: Team Snapshot */}
+                    {/* Right Sidebar: Deadlines + Team */}
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.5 }}
                         className="space-y-6"
                     >
-                        <h2 className="text-2xl font-black text-gray-900 dark:text-white">My Team</h2>
+                        {/* Overdue / High Priority Warning */}
+                        {(analytics.overdueTasks.length > 0 || analytics.highPriorityTasks.length > 0) && (
+                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-3xl p-5 border border-amber-200/50 dark:border-amber-700/50 shadow-lg">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400" />
+                                    <h3 className="font-bold text-amber-900 dark:text-amber-200">Needs Attention</h3>
+                                </div>
+                                {analytics.overdueTasks.length > 0 && (
+                                    <div className="flex items-center justify-between py-2">
+                                        <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">Overdue tasks</span>
+                                        <span className="px-2.5 py-1 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-bold">{analytics.overdueTasks.length}</span>
+                                    </div>
+                                )}
+                                {analytics.highPriorityTasks.length > 0 && (
+                                    <div className="flex items-center justify-between py-2">
+                                        <span className="text-sm text-amber-800 dark:text-amber-300 font-medium">High priority</span>
+                                        <span className="px-2.5 py-1 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-bold">{analytics.highPriorityTasks.length}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Upcoming Events */}
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Calendar size={18} className="text-indigo-500" /> Upcoming
+                                </h3>
+                                <button onClick={() => navigate('/calendar')} className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:text-indigo-700">View All</button>
+                            </div>
+                            {analytics.upcomingEvents.length > 0 ? (
+                                <div className="space-y-3">
+                                    {analytics.upcomingEvents.map((event, i) => (
+                                        <div key={event._id || i} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80 dark:bg-gray-900/40 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors group">
+                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-md">
+                                                {new Date(event.start || event.date).getDate()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{event.title}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                                    {new Date(event.start || event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-6">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No upcoming events</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Task Progress Ring */}
+                        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-lg">
+                            <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <CheckCircle size={18} className="text-emerald-500" /> Task Overview
+                            </h3>
+                            <div className="flex items-center justify-center mb-4">
+                                <div className="relative w-32 h-32">
+                                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-200 dark:text-gray-700" />
+                                        <motion.path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none"
+                                            stroke="url(#progressGradient)"
+                                            strokeWidth="3"
+                                            strokeLinecap="round"
+                                            initial={{ strokeDasharray: '0, 100' }}
+                                            animate={{ strokeDasharray: `${analytics.completionRate}, 100` }}
+                                            transition={{ delay: 0.8, duration: 1, ease: 'easeOut' }}
+                                        />
+                                        <defs>
+                                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stopColor="#6366f1" />
+                                                <stop offset="100%" stopColor="#a855f7" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-2xl font-black text-gray-900 dark:text-white">{analytics.completionRate}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/20">
+                                    <p className="text-lg font-black text-blue-600 dark:text-blue-400">{analytics.todoTasks}</p>
+                                    <p className="text-[10px] font-bold text-blue-500/80 uppercase">To Do</p>
+                                </div>
+                                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                                    <p className="text-lg font-black text-amber-600 dark:text-amber-400">{analytics.inProgressTasks}</p>
+                                    <p className="text-[10px] font-bold text-amber-500/80 uppercase">Active</p>
+                                </div>
+                                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
+                                    <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{analytics.completedTasks}</p>
+                                    <p className="text-[10px] font-bold text-emerald-500/80 uppercase">Done</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Team Card */}
                         <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
                             <div className="relative z-10">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl shadow-lg">
-                                        <Users size={28} strokeWidth={2} />
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl shadow-lg">
+                                        <Shield size={24} strokeWidth={2} />
                                     </div>
                                     <span className="text-xs font-black bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-md">Active</span>
                                 </div>
-                                <h3 className="text-4xl font-black mb-2">{user.role === 'admin' ? 'Admin Access' : 'Member'}</h3>
-                                <p className="text-indigo-100 text-sm mb-8 font-medium">Manage your workspace collaboration.</p>
+                                <h3 className="text-3xl font-black mb-2">{user.role === 'admin' ? 'Admin Access' : 'Member'}</h3>
+                                <p className="text-indigo-100 text-sm mb-6 font-medium">Manage your workspace.</p>
 
                                 {user.role === 'admin' && (
                                     <motion.button
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                         onClick={() => navigate('/team-management')}
-                                        className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all shadow-xl"
+                                        className="w-full py-3.5 bg-white text-indigo-600 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all shadow-xl"
                                     >
                                         Manage Team
                                     </motion.button>
@@ -219,21 +481,20 @@ const Dashboard = () => {
                                 {user.role !== 'admin' && (
                                     <div className="flex -space-x-3 mt-2">
                                         {teamMembers.length > 0 ? teamMembers.slice(0, 5).map(m => (
-                                            <div key={m._id} className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg" title={m.name}>
+                                            <div key={m._id} className="w-11 h-11 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg" title={m.name}>
                                                 {m.name.charAt(0)}
                                             </div>
                                         )) : (
                                             <p className="text-sm opacity-80">No team members</p>
                                         )}
                                         {teamMembers.length > 5 && (
-                                            <div className="w-12 h-12 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg">
+                                            <div className="w-11 h-11 rounded-full border-2 border-white/50 bg-white/20 backdrop-blur-md flex items-center justify-center text-sm font-bold shadow-lg">
                                                 +{teamMembers.length - 5}
                                             </div>
                                         )}
                                     </div>
                                 )}
                             </div>
-                            {/* Decorative Elements */}
                             <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                             <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
                         </div>

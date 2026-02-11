@@ -4,6 +4,7 @@ import PasswordCard from '../components/PasswordManager/PasswordCard';
 import PasswordModal from '../components/PasswordManager/PasswordModal';
 import { Lock, Plus, Search, Key, Calendar, Globe, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { PasswordGridSkeleton } from '../components/SkeletonLoader';
 
 const PasswordManager = () => {
   const {
@@ -107,13 +108,7 @@ const PasswordManager = () => {
 
         {/* Loading State */}
         {isLoading ? (
-          <div className="flex justify-center py-20">
-            <div className="flex space-x-3">
-              <div className="w-4 h-4 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-              <div className="w-4 h-4 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-              <div className="w-4 h-4 bg-indigo-400 rounded-full animate-bounce"></div>
-            </div>
-          </div>
+          <PasswordGridSkeleton />
         ) : (
           <>
             {/* Password Entries */}

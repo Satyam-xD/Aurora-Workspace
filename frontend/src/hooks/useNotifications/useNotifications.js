@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useChatContext } from '../../context/ChatContext';
 import { MessageCircle, Video, FileText, UserPlus, Calendar, CheckSquare, Clock, AlertCircle, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const typeIcons = {
     'task_assigned': CheckSquare,
@@ -77,6 +78,12 @@ export const useNotifications = () => {
                 time: 'Just now'
             };
             setDbNotifications(prev => [formattedNotif, ...prev]);
+
+            // Show toast popup for real-time notification
+            toast(notification.title, {
+                description: notification.description,
+                duration: 5000,
+            });
         };
 
         socketRef.current.on('newNotification', handleNewNotification);
@@ -178,11 +185,18 @@ export const useNotifications = () => {
     };
 
     const filteredNotifications = useMemo(() => {
-        return filter === 'all'
-            ? notifications
-            : filter === 'unread'
-                ? notifications.filter(n => !n.read)
-                : notifications;
+        switch (filter) {
+            case 'unread':
+                return notifications.filter(n => !n.read);
+            case 'tasks':
+                return notifications.filter(n => n.type === 'task_assigned' || n.type === 'task_updated');
+            case 'events':
+                return notifications.filter(n => n.type === 'event_created' || n.type === 'event_reminder');
+            case 'messages':
+                return notifications.filter(n => n.type === 'message');
+            default:
+                return notifications;
+        }
     }, [notifications, filter]);
 
     const unreadCount = notifications.filter(n => !n.read).length;

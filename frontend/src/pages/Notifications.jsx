@@ -6,6 +6,7 @@ import NotificationFilters from '../components/Notifications/NotificationFilters
 import NotificationItem from '../components/Notifications/NotificationItem';
 import { Bell, Filter, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CardListSkeleton } from '../components/SkeletonLoader';
 
 const Notifications = () => {
   const { filter: paramFilter } = useParams();
@@ -18,11 +19,14 @@ const Notifications = () => {
     markAllAsRead,
     deleteNotification,
     filteredNotifications,
-    unreadCount
+    unreadCount,
+    notifications
   } = useNotifications();
 
+  const isLoading = notifications === undefined;
+
   useEffect(() => {
-    if (paramFilter && ['all', 'unread'].includes(paramFilter)) {
+    if (paramFilter && ['all', 'unread', 'tasks', 'events', 'messages'].includes(paramFilter)) {
       setFilter(paramFilter);
     } else {
       setFilter('all');
@@ -80,41 +84,45 @@ const Notifications = () => {
         </motion.div>
 
         {/* Notifications List */}
-        <motion.div className="space-y-4">
-          <AnimatePresence mode='popLayout'>
-            {filteredNotifications.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="text-center py-20 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-dashed border-gray-300 dark:border-gray-700"
-              >
-                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                  <Bell className="text-gray-400 dark:text-gray-500" size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">No notifications</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">You're all caught up!</p>
-              </motion.div>
-            ) : (
-              filteredNotifications.map((notification) => (
+        {isLoading ? (
+          <CardListSkeleton count={5} />
+        ) : (
+          <motion.div className="space-y-4">
+            <AnimatePresence mode='popLayout'>
+              {filteredNotifications.length === 0 ? (
                 <motion.div
-                  key={notification.id}
-                  layout
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="text-center py-20 bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl border border-dashed border-gray-300 dark:border-gray-700"
                 >
-                  <NotificationItem
-                    notification={notification}
-                    markAsRead={markAsRead}
-                    deleteNotification={deleteNotification}
-                  />
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <Bell className="text-gray-400 dark:text-gray-500" size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">No notifications</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2">You're all caught up!</p>
                 </motion.div>
-              ))
-            )}
-          </AnimatePresence>
-        </motion.div>
+              ) : (
+                filteredNotifications.map((notification) => (
+                  <motion.div
+                    key={notification.id}
+                    layout
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  >
+                    <NotificationItem
+                      notification={notification}
+                      markAsRead={markAsRead}
+                      deleteNotification={deleteNotification}
+                    />
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </div>
   );
