@@ -60,12 +60,12 @@ To run the application locally:
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/Satyam-xD/Digital_Workspace.git
+    git clone https://github.com/Satyam-xD/Aurora-Workspace.git
     ```
 
 2.  **Navigate to the frontend directory**:
     ```bash
-    cd Digital_Workspace/frontend
+    cd Aurora-Workspace/frontend
     ```
 
 3.  **Install dependencies**:
