@@ -204,7 +204,7 @@ const updateTask = asyncHandler(async (req, res) => {
 
         // Notify team or assigned user about update
         if (team && req.body.status && req.body.status !== task.status) {
-            const teamMemberIds = team.members
+            const teamMemberIds = [...team.members, team.owner]
                 .filter(id => id.toString() !== req.user.id)
                 .map(id => id.toString());
 

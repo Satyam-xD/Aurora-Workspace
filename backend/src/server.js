@@ -128,7 +128,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 4001;
 
 server.listen(port, () => {
   console.log(`Backend listening on http://localhost:${port}`);

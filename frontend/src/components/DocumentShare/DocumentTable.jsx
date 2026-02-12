@@ -2,7 +2,7 @@
 import React from 'react';
 import { Download, Share2, Trash2 } from 'lucide-react';
 
-const DocumentTable = ({ loading, filteredDocs, handleDelete, handleShare, getFileIcon }) => {
+const DocumentTable = ({ loading, filteredDocs, handleDelete, handleDownload, handleShare, getFileIcon }) => {
     return (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -44,7 +44,7 @@ const DocumentTable = ({ loading, filteredDocs, handleDelete, handleShare, getFi
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <div className="h-6 w-6 rounded-full bg-gradient-to-br from-aurora-500 to-purple-500 flex items-center justify-center text-[10px] text-white font-bold">
-                                                    U
+                                                    {doc.uploadedBy?.name ? doc.uploadedBy.name.charAt(0).toUpperCase() : 'U'}
                                                 </div>
                                                 <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">
                                                     {doc.uploadedBy?.name || 'Unknown'}
@@ -59,18 +59,17 @@ const DocumentTable = ({ loading, filteredDocs, handleDelete, handleShare, getFi
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <a
-                                                    href={doc.url.startsWith('/') ? doc.url : `/${doc.url}`}
-                                                    download
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
+                                                <button
+                                                    onClick={() => handleDownload(doc)}
                                                     className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                    title="Download"
                                                 >
                                                     <Download size={16} />
-                                                </a>
+                                                </button>
                                                 <button
                                                     onClick={() => handleShare(doc)}
                                                     className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                    title="Copy link"
                                                 >
                                                     <Share2 size={16} />
                                                 </button>
@@ -95,3 +94,4 @@ const DocumentTable = ({ loading, filteredDocs, handleDelete, handleShare, getFi
 };
 
 export default DocumentTable;
+

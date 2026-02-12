@@ -6,7 +6,6 @@ import Activity from '../models/Activity.js';
 import { createNotifications } from '../utils/notificationService.js';
 
 // Helper to get stats properly
-// Helper to get stats properly
 const getMemberStats = async (memberId) => {
     try {
         if (!memberId) return { tasksAssigned: 0, tasksCompleted: 0 };

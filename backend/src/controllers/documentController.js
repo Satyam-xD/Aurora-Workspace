@@ -43,8 +43,9 @@ const getDocuments = asyncHandler(async (req, res) => {
         throw new Error('Team not found');
     }
 
-    // Check if user is member (or owner)
-    const isMember = team.members.includes(req.user.id) || team.owner.toString() === req.user.id;
+    // Check if user is member (or owner) — use string comparison for ObjectIds
+    const userId = req.user.id.toString();
+    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
     if (!isMember) {
         res.status(401);
         throw new Error('Not authorized to access this team files');
@@ -77,60 +78,77 @@ const getDocuments = asyncHandler(async (req, res) => {
 // @route   POST /api/documents/upload
 // @access  Private
 const uploadDocument = asyncHandler(async (req, res) => {
-    upload(req, res, async function (err) {
-        if (err) {
-            res.status(400);
-            throw new Error(err.message);
-        }
-
-        const { teamId, folderId } = req.body;
-
-        if (!req.file) {
-            res.status(400);
-            throw new Error('No file uploaded');
-        }
-
-        // Validate Team
-        const team = await Team.findById(teamId);
-        if (!team) {
-            // Cleanup file if error
-            if (req.file) fs.unlinkSync(req.file.path);
-            res.status(404);
-            throw new Error('Team not found');
-        }
-
-        const document = await Document.create({
-            team: teamId,
-            folder: folderId && folderId !== 'null' ? folderId : null,
-            uploadedBy: req.user.id,
-            user: req.user.id, // Legacy field, kept for safety
-            name: req.file.originalname,
-            type: req.file.originalname.split('.').pop(),
-            size: (req.file.size / (1024 * 1024)).toFixed(2) + ' MB',
-            url: `/uploads/${req.file.filename}`, // Relative URL
+    // Wrap multer in a Promise so asyncHandler properly catches errors
+    await new Promise((resolve, reject) => {
+        upload(req, res, (err) => {
+            if (err) return reject(err);
+            resolve();
         });
-
-        // Trigger Notification for the team
-        const io = req.app.get('socketio');
-        const recipientIds = [...team.members, team.owner]
-            .map(id => id.toString())
-            .filter(id => id !== req.user.id.toString());
-
-        if (recipientIds.length > 0) {
-            await createNotifications(recipientIds, {
-                title: 'New Document Uploaded',
-                description: `"${document.name}" has been uploaded to the team library`,
-                type: 'document_shared',
-                sender: req.user.id,
-                link: '/documents'
-            }, io);
-        }
-
-        // Return full doc with populated user
-        const populatedDoc = await Document.findById(document._id).populate('uploadedBy', 'name');
-
-        res.status(201).json(populatedDoc);
+    }).catch((err) => {
+        res.status(400);
+        throw new Error(err.message || 'File upload failed');
     });
+
+    const { teamId, folderId } = req.body;
+
+    if (!req.file) {
+        res.status(400);
+        throw new Error('No file uploaded');
+    }
+
+    // Validate Team
+    const team = await Team.findById(teamId);
+    if (!team) {
+        // Cleanup file if error
+        if (req.file) {
+            try { fs.unlinkSync(req.file.path); } catch (_) { }
+        }
+        res.status(404);
+        throw new Error('Team not found');
+    }
+
+    // Verify the uploader is a team member or owner
+    const userId = req.user.id.toString();
+    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
+    if (!isMember) {
+        if (req.file) {
+            try { fs.unlinkSync(req.file.path); } catch (_) { }
+        }
+        res.status(403);
+        throw new Error('Not authorized to upload to this team');
+    }
+
+    const document = await Document.create({
+        team: teamId,
+        folder: folderId && folderId !== 'null' ? folderId : null,
+        uploadedBy: req.user.id,
+        user: req.user.id, // Legacy field, kept for safety
+        name: req.file.originalname,
+        type: req.file.originalname.split('.').pop(),
+        size: (req.file.size / (1024 * 1024)).toFixed(2) + ' MB',
+        url: `/uploads/${req.file.filename}`, // Relative URL
+    });
+
+    // Trigger Notification for the team
+    const io = req.app.get('socketio');
+    const recipientIds = [...team.members, team.owner]
+        .map(id => id.toString())
+        .filter(id => id !== req.user.id.toString());
+
+    if (recipientIds.length > 0) {
+        await createNotifications(recipientIds, {
+            title: 'New Document Uploaded',
+            description: `"${document.name}" has been uploaded to the team library`,
+            type: 'document_shared',
+            sender: req.user.id,
+            link: '/document-share'
+        }, io);
+    }
+
+    // Return full doc with populated user
+    const populatedDoc = await Document.findById(document._id).populate('uploadedBy', 'name');
+
+    res.status(201).json(populatedDoc);
 });
 
 // @desc    Create Folder
@@ -200,26 +218,72 @@ const deleteFolder = asyncHandler(async (req, res) => {
         throw new Error('Only Team Heads can delete folders');
     }
 
-    // Recursive delete or deny if not empty? 
-    // Simplify: Delete folder and its contents? Or orphan them?
-    // Let's delete sub-items.
-
-    // 1. Delete Documents in this folder
-    const docs = await Document.find({ folder: folder._id });
-    for (const doc of docs) {
-        // Delete file from disk
-        const filePath = path.join(path.resolve(), doc.url.substring(1)); // Remove leading slash
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+    // Recursive helper to delete a folder and all its contents
+    const deleteFolderRecursive = async (folderId) => {
+        // 1. Find and recursively delete all subfolders
+        const subfolders = await Folder.find({ parentFolder: folderId });
+        for (const subfolder of subfolders) {
+            await deleteFolderRecursive(subfolder._id);
         }
-        await doc.deleteOne();
-    }
 
-    // 2. Delete Folder
-    await folder.deleteOne();
-    // Ideally we should delete subfolders recursively too. For this MVP, let's assume one level depth or user cleans up.
+        // 2. Delete all documents in this folder
+        const docs = await Document.find({ folder: folderId });
+        for (const doc of docs) {
+            // Delete file from disk
+            const filePath = path.join(path.resolve(), doc.url.substring(1));
+            if (fs.existsSync(filePath)) {
+                try { fs.unlinkSync(filePath); } catch (_) { }
+            }
+            await doc.deleteOne();
+        }
+
+        // 3. Delete the folder itself
+        await Folder.findByIdAndDelete(folderId);
+    };
+
+    await deleteFolderRecursive(folder._id);
 
     res.json({ message: 'Folder deleted' });
+});
+
+// @desc    Download document
+// @route   GET /api/documents/download/:id
+// @access  Private
+const downloadDocument = asyncHandler(async (req, res) => {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+        res.status(404);
+        throw new Error('Document not found');
+    }
+
+    // Verify the requester is a team member or owner
+    const team = await Team.findById(document.team);
+    if (!team) {
+        res.status(404);
+        throw new Error('Team not found');
+    }
+
+    const userId = req.user.id.toString();
+    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
+    if (!isMember) {
+        res.status(403);
+        throw new Error('Not authorized to download this file');
+    }
+
+    // Resolve the file path on disk
+    const filePath = path.join(path.resolve(), document.url.replace(/^\//, ''));
+    if (!fs.existsSync(filePath)) {
+        res.status(404);
+        throw new Error('File not found on server');
+    }
+
+    // Set proper headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${document.name}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
 });
 
 // @desc    Delete document
@@ -258,4 +322,4 @@ const deleteDocument = asyncHandler(async (req, res) => {
     res.json({ id: req.params.id });
 });
 
-export { getDocuments, uploadDocument, deleteDocument, createFolder, renameFolder, deleteFolder };
+export { getDocuments, uploadDocument, downloadDocument, deleteDocument, createFolder, renameFolder, deleteFolder };

@@ -170,6 +170,35 @@ export const useDocumentShare = () => {
         }
     }
 
+    const handleDownload = async (doc) => {
+        try {
+            const response = await fetch(`/api/documents/download/${doc._id}`, {
+                headers: {
+                    'Authorization': `Bearer ${user.token}`,
+                },
+            });
+
+            if (!response.ok) {
+                toast.error('Failed to download file');
+                return;
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = doc.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            toast.success('Download started');
+        } catch (error) {
+            console.error('Download error:', error);
+            toast.error('Failed to download file');
+        }
+    };
+
     const handleShare = (doc) => {
         // Since URL is relative, construct full URL
         const link = `${window.location.origin}${doc.url}`;
@@ -237,6 +266,7 @@ export const useDocumentShare = () => {
         renameFolder,
         deleteFolder,
         handleDelete,
+        handleDownload,
         handleShare,
         getFileIcon,
         filteredDocs,

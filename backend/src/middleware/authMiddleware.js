@@ -3,14 +3,12 @@ import asyncHandler from 'express-async-handler';
 import User from '../models/User.js';
 
 const protect = asyncHandler(async (req, res, next) => {
-    let token;
-
     if (
         req.headers.authorization &&
         req.headers.authorization.startsWith('Bearer')
     ) {
         try {
-            token = req.headers.authorization.split(' ')[1];
+            const token = req.headers.authorization.split(' ')[1];
 
             if (!process.env.JWT_SECRET) {
                 console.error('JWT_SECRET is not defined in environment variables');
@@ -27,7 +25,7 @@ const protect = asyncHandler(async (req, res, next) => {
                 throw new Error('User not found');
             }
 
-            next();
+            return next();
         } catch (error) {
             console.error('Auth Error:', error.message);
             res.status(401);
@@ -35,10 +33,9 @@ const protect = asyncHandler(async (req, res, next) => {
         }
     }
 
-    if (!token) {
-        res.status(401);
-        throw new Error('Not authorized, no token');
-    }
+    // No Authorization header present at all
+    res.status(401);
+    throw new Error('Not authorized, no token');
 });
 
 const admin = (req, res, next) => {

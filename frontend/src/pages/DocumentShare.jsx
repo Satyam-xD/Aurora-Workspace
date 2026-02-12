@@ -22,6 +22,7 @@ const DocumentShare = () => {
     renameFolder,
     deleteFolder,
     handleDelete,
+    handleDownload,
     handleShare,
     getFileIcon,
     filteredDocs,
@@ -160,6 +161,7 @@ const DocumentShare = () => {
               loading={loading}
               filteredDocs={filteredDocs}
               handleDelete={handleDelete}
+              handleDownload={handleDownload}
               handleShare={handleShare}
               getFileIcon={getFileIcon}
             />

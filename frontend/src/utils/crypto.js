@@ -107,10 +107,12 @@ export async function decryptPassword(encryptedBase64, masterKey) {
  */
 export function isEncrypted(value) {
     if (!value || typeof value !== 'string') return false;
+    // Must be pure base64 (no spaces, punctuation, etc.)
+    if (!/^[A-Za-z0-9+/]+=*$/.test(value)) return false;
     try {
         const decoded = atob(value);
-        // Minimum: 16 (salt) + 12 (iv) + 1 (min ciphertext) = 29 bytes
-        return decoded.length >= 29;
+        // Minimum: 16 (salt) + 12 (iv) + 16 (AES-GCM auth tag, minimum) = 44 bytes
+        return decoded.length >= 44;
     } catch {
         return false;
     }

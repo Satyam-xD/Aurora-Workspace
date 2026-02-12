@@ -50,12 +50,12 @@ const updatePassword = asyncHandler(async (req, res) => {
         throw new Error('User not authorized');
     }
 
-    pass.title = req.body.title || pass.title;
-    pass.username = req.body.username || pass.username;
-    pass.password = req.body.password || pass.password;
-    pass.url = req.body.url || pass.url;
-    pass.category = req.body.category || pass.category;
-    pass.notes = req.body.notes || pass.notes;
+    pass.title = req.body.title !== undefined ? req.body.title : pass.title;
+    pass.username = req.body.username !== undefined ? req.body.username : pass.username;
+    pass.password = req.body.password !== undefined ? req.body.password : pass.password;
+    pass.url = req.body.url !== undefined ? req.body.url : pass.url;
+    pass.category = req.body.category !== undefined ? req.body.category : pass.category;
+    pass.notes = req.body.notes !== undefined ? req.body.notes : pass.notes;
 
     const updatedPassword = await pass.save();
     res.json(updatedPassword);

@@ -33,7 +33,7 @@ const accessChat = asyncHandler(async (req, res) => {
         res.send(isChat[0]);
     } else {
         // Create new chat
-        var chatData = {
+        const chatData = {
             chatName: 'sender',
             isGroupChat: false,
             users: [req.user._id, userId],
@@ -57,23 +57,18 @@ const accessChat = asyncHandler(async (req, res) => {
 // @route   GET /api/chat
 // @access  Private
 const fetchChats = asyncHandler(async (req, res) => {
-    try {
-        Conversation.find({ users: { $elemMatch: { $eq: req.user._id } } })
-            .populate('users', '-password')
-            .populate('groupAdmin', '-password')
-            .populate('latestMessage')
-            .sort({ updatedAt: -1 })
-            .then(async (results) => {
-                results = await User.populate(results, {
-                    path: 'latestMessage.sender',
-                    select: 'name email',
-                });
-                res.status(200).send(results);
-            });
-    } catch (error) {
-        res.status(400);
-        throw new Error(error.message);
-    }
+    let results = await Conversation.find({ users: { $elemMatch: { $eq: req.user._id } } })
+        .populate('users', '-password')
+        .populate('groupAdmin', '-password')
+        .populate('latestMessage')
+        .sort({ updatedAt: -1 });
+
+    results = await User.populate(results, {
+        path: 'latestMessage.sender',
+        select: 'name email',
+    });
+
+    res.status(200).send(results);
 });
 
 // @desc    Create Group Chat
@@ -84,9 +79,9 @@ const createGroupChat = asyncHandler(async (req, res) => {
         return res.status(400).send({ message: 'Please Fill all the fields' });
     }
 
-    var users = JSON.parse(req.body.users);
+    const users = JSON.parse(req.body.users);
 
-    if (users.length < 0) { // Temporary: Allow single user group for demo
+    if (users.length < 2) {
         return res
             .status(400)
             .send('More than 2 users are required to form a group chat');
@@ -211,19 +206,24 @@ const upload = multer({
 // @route   POST /api/chat/upload
 // @access  Private
 const uploadAttachment = asyncHandler(async (req, res) => {
-    upload(req, res, function (err) {
-        if (err) {
-            res.status(400);
-            throw new Error(err.message);
-        }
-        if (!req.file) {
-            res.status(400);
-            throw new Error("No file selected");
-        }
-        res.json({
-            url: `/uploads/${req.file.filename}`,
-            type: req.file.mimetype.startsWith('image/') ? 'image' : 'file'
+    await new Promise((resolve, reject) => {
+        upload(req, res, (err) => {
+            if (err) return reject(err);
+            resolve();
         });
+    }).catch((err) => {
+        res.status(400);
+        throw new Error(err.message || 'File upload failed');
+    });
+
+    if (!req.file) {
+        res.status(400);
+        throw new Error("No file selected");
+    }
+
+    res.json({
+        url: `/uploads/${req.file.filename}`,
+        type: req.file.mimetype.startsWith('image/') ? 'image' : 'file'
     });
 });
 

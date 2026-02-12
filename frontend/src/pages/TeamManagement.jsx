@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTeamManagement } from '../hooks/useTeamManagement/useTeamManagement';
-import { ChevronDown, Plus, Check, Trash2, Edit2 } from 'lucide-react';
+import { Trash2, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TeamStats from '../components/TeamManagement/TeamStats';
 import InviteMember from '../components/TeamManagement/InviteMember';
@@ -33,7 +33,11 @@ const TeamManagement = () => {
     updateTeamDetails,
     deleteTeam,
     activities,
-    isAdmin
+    isAdmin,
+    allUsers,
+    usersLoading,
+    searchUsers,
+    fetchAllUsers
   } = useTeamManagement();
 
 
@@ -163,6 +167,10 @@ const TeamManagement = () => {
                     loading={loading}
                     error={error}
                     success={success}
+                    allUsers={allUsers}
+                    usersLoading={usersLoading}
+                    searchUsers={searchUsers}
+                    fetchAllUsers={fetchAllUsers}
                   />
                 </div>
               </motion.div>
