@@ -149,7 +149,12 @@ const ActiveCall = ({
                     {/* Remote video (full area) */}
                     {isVideoCall && callAccepted && remoteStream && (
                         <video
-                            ref={userVideoRef}
+                            ref={(node) => {
+                                userVideoRef.current = node;
+                                if (node && remoteStream && node.srcObject !== remoteStream) {
+                                    node.srcObject = remoteStream;
+                                }
+                            }}
                             autoPlay
                             playsInline
                             className="absolute inset-0 w-full h-full object-cover"
@@ -158,7 +163,17 @@ const ActiveCall = ({
 
                     {/* Audio element (hidden) for audio calls */}
                     {!isVideoCall && (
-                        <audio ref={userVideoRef} autoPlay playsInline className="hidden" />
+                        <audio 
+                            ref={(node) => {
+                                userVideoRef.current = node;
+                                if (node && remoteStream && node.srcObject !== remoteStream) {
+                                    node.srcObject = remoteStream;
+                                }
+                            }}
+                            autoPlay 
+                            playsInline 
+                            className="hidden" 
+                        />
                     )}
 
                     {/* Center avatar / status (shown before connection or audio-only) */}
@@ -225,7 +240,12 @@ const ActiveCall = ({
                                 </div>
                             ) : (
                                 <video
-                                    ref={myVideoRef}
+                                    ref={(node) => {
+                                        myVideoRef.current = node;
+                                        if (node && stream && node.srcObject !== stream) {
+                                            node.srcObject = stream;
+                                        }
+                                    }}
                                     autoPlay
                                     playsInline
                                     muted
@@ -316,26 +336,30 @@ const VideoCall = ({
     callerName,
     callerId,
     userToCall,
+    iceCandidates,
     onEndCall,
     onAnswer,
     isVideoCall = true,
 }) => {
+    const [isAnswering, setIsAnswering] = useState(false);
     const call = useDirectCall({
         isIncoming,
         callerSignal,
         callerId,
         userToCall,
+        iceCandidates,
         onEndCall,
         isVideoCall,
     });
 
     // Show incoming ring screen before user answers
-    if (isIncoming && !call.callAccepted && !call.callEnded) {
+    if (isIncoming && !call.callAccepted && !call.callEnded && !isAnswering) {
         return (
             <IncomingCall
                 callerName={callerName}
                 isVideoCall={isVideoCall}
                 onAnswer={() => {
+                    setIsAnswering(true);
                     onAnswer?.();     // update ChatContext callAccepted state
                     call.answerCall();
                 }}

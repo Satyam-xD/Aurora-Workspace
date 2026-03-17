@@ -260,7 +260,19 @@ export const ChatProvider = ({ children }) => {
         // Listen for incoming 1-on-1 calls
         socketRef.current.on('callUser', ({ from, name, signal, isVideo }) => {
             logger.log('Receiving call from', name, 'Video:', isVideo);
-            setCall({ isReceivingCall: true, from, name, signal, isVideo });
+            setCall({ isReceivingCall: true, from, name, signal, isVideo, iceCandidates: [] });
+        });
+
+        // Buffer all incoming ICE candidates to avoid race conditions
+        socketRef.current.on('ice-candidate', (candidate) => {
+            setCall(prev => {
+                // Ignore if not actively managing a call
+                if (!prev.isReceivingCall && !prev.userToCall) return prev;
+                return {
+                    ...prev,
+                    iceCandidates: [...(prev.iceCandidates || []), candidate]
+                };
+            });
         });
 
         return () => {
@@ -279,7 +291,7 @@ export const ChatProvider = ({ children }) => {
         setCallAccepted(false);
         setCallEnded(false);
         setIsCalling(true);
-        setCall({ isReceivingCall: false, userToCall: userId, name: userName, isVideo });
+        setCall({ isReceivingCall: false, userToCall: userId, name: userName, isVideo, iceCandidates: [] });
     };
 
     const answerCall = () => {

@@ -274,7 +274,7 @@ const addTeamMember = asyncHandler(async (req, res) => {
 
     // BUG FIX: .includes() doesn't work with ObjectIds — use .some() with .toString()
     const alreadyMember = targetTeam.members.some(
-        id => id.toString() === userToAdd._id.toString()
+        id => id && id.toString() === userToAdd._id.toString()
     );
     if (alreadyMember) {
         res.status(400);
@@ -287,6 +287,7 @@ const addTeamMember = asyncHandler(async (req, res) => {
     // Trigger Notification for the team
     const io = req.app.get('socketio');
     const recipientIds = [...targetTeam.members, targetTeam.owner]
+        .filter(id => id != null)
         .map(id => id.toString())
         .filter(id => id !== req.user._id.toString());
 
@@ -368,18 +369,19 @@ const removeTeamMember = asyncHandler(async (req, res) => {
     }
 
     // BUG FIX: .includes() doesn't work with ObjectIds — use .some() with .toString()
-    const memberExists = team.members.some(id => id.toString() === memberId);
+    const memberExists = team.members.some(id => id && id.toString() === memberId);
     if (!memberExists) {
         res.status(404);
         throw new Error('Member not found in this team');
     }
 
-    team.members = team.members.filter(id => id.toString() !== memberId);
+    team.members = team.members.filter(id => id && id.toString() !== memberId);
     await team.save();
 
     // Trigger Notification for the remaining team
     const io = req.app.get('socketio');
     const recipientIds = [...team.members, team.owner]
+        .filter(id => id != null)
         .map(id => id.toString())
         .filter(id => id !== req.user._id.toString());
 
@@ -445,7 +447,7 @@ const getTeamActivity = asyncHandler(async (req, res) => {
     }
 
     const isOwner = team.owner.toString() === req.user._id.toString();
-    const isMember = team.members.some(m => m.toString() === req.user._id.toString());
+    const isMember = team.members.some(m => m && m.toString() === req.user._id.toString());
 
     if (!isOwner && !isMember) {
         res.status(403);

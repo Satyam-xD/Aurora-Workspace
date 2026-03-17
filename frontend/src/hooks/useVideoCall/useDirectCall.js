@@ -17,6 +17,7 @@ export const useDirectCall = ({
     callerSignal,
     callerId,
     userToCall,
+    iceCandidates = [],
     onEndCall,
     isVideoCall = true,
 }) => {
@@ -41,6 +42,8 @@ export const useDirectCall = ({
     const iceCandidateQueue = useRef([]);
     const isMountedRef = useRef(true);
     const callEndedRef = useRef(false);
+    const initPromiseRef = useRef(null);
+    const processedIceCountRef = useRef(0);
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     const cleanup = useCallback(() => {
@@ -191,42 +194,21 @@ export const useDirectCall = ({
                 onEndCall?.();
             };
 
-            const onIceCandidate = async (candidate) => {
-                if (!peerRef.current || callEndedRef.current) return;
-                const iceCandidate = new RTCIceCandidate(candidate);
-                if (peerRef.current.remoteDescription?.type) {
-                    peerRef.current
-                        .addIceCandidate(iceCandidate)
-                        .catch(e => logger.error('addIceCandidate error:', e));
-                } else {
-                    iceCandidateQueue.current.push(iceCandidate);
-                }
-            };
-
             socket.on('callAccepted', onCallAccepted);
             socket.on('callEnded', onCallEnded);
-            socket.on('ice-candidate', onIceCandidate);
-
-            // ── Get media ──────────────────────────────────────────────────
-            const mediaStream = await getMedia();
-            // Continue even if media fails (audio-only fallback handled by constraints)
-            if (!isMountedRef.current) return;
-
-            // ── Create peer ────────────────────────────────────────────────
-            const peer = createPeer(mediaStream);
-
             if (!isIncoming) {
-                // ── OUTGOING: create and send offer ───────────────────────
+                // ── OUTGOING ONLY: Fetch media & create/send offer ────────────────
+                const mediaStream = await getMedia();
+                if (!isMountedRef.current) return;
+                
+                const peer = createPeer(mediaStream);
                 try {
                     setConnectionState('calling');
-                    const offer = await peer.createOffer({
-                        offerToReceiveAudio: true,
-                        offerToReceiveVideo: isVideoCall,
-                    });
+                    const offer = await peer.createOffer();
                     await peer.setLocalDescription(offer);
                     socket.emit('callUser', {
                         userToCall,
-                        signalData: peer.localDescription,
+                        signalData: offer,
                         from: user?._id || user?.id,
                         name: user?.name,
                         isVideo: isVideoCall,
@@ -237,19 +219,20 @@ export const useDirectCall = ({
                     setMediaError('Failed to initiate the call. Please try again.');
                 }
             } else {
-                // ── INCOMING: mark as waiting for user to click Answer ─────
+                // ── INCOMING: Wait for user to answer before creating peer/media ─
                 setConnectionState('incoming');
             }
 
             return () => {
                 socket.off('callAccepted', onCallAccepted);
                 socket.off('callEnded', onCallEnded);
-                socket.off('ice-candidate', onIceCandidate);
             };
         };
 
+        const promise = init();
+        initPromiseRef.current = promise;
         let socketCleanup;
-        init().then(fn => { socketCleanup = fn; });
+        promise.then(fn => { socketCleanup = fn; });
 
         return () => {
             isMountedRef.current = false;
@@ -264,32 +247,71 @@ export const useDirectCall = ({
         if (myVideoRef.current && stream) myVideoRef.current.srcObject = stream;
     }, [stream]);
 
+    // Sync remote streams when they arrive
     useEffect(() => {
-        if (userVideoRef.current && remoteStream) userVideoRef.current.srcObject = remoteStream;
+        if (userVideoRef.current && remoteStream) {
+            userVideoRef.current.srcObject = remoteStream;
+        }
     }, [remoteStream]);
 
-    // ── Answer call ────────────────────────────────────────────────────────
+    // Process incoming ICE candidates buffered in ChatContext
+    useEffect(() => {
+        const peer = peerRef.current;
+        if (!peer || callEndedRef.current) return;
+
+        const newCandidates = iceCandidates.slice(processedIceCountRef.current);
+        if (newCandidates.length === 0) return;
+
+        newCandidates.forEach(candidate => {
+            const iceCandidate = new RTCIceCandidate(candidate);
+            if (peer.remoteDescription?.type) {
+                peer.addIceCandidate(iceCandidate).catch(e => logger.error('addIceCandidate error:', e));
+            } else {
+                iceCandidateQueue.current.push(iceCandidate);
+            }
+        });
+
+        processedIceCountRef.current = iceCandidates.length;
+    }, [iceCandidates, connectionState]);
+
     const answerCall = useCallback(async () => {
         if (callEndedRef.current) return;
-        const socket = socketRef.current;
-        const peer = peerRef.current;
-        if (!peer || !socket) return;
 
-        logger.log('Answering call from', callerId);
+        const socket = socketRef.current;
+        if (!socket) {
+            logger.error('Cannot answer call: socket not available');
+            setMediaError('WebSockets unavailable. Please refresh.');
+            return;
+        }
+
         try {
+            logger.log('Answering call from', callerId);
+            setConnectionState('connecting');
+
+            // 1. Fetch Media securely on button click
+            const mediaStream = await getMedia();
+            if (!mediaStream) {
+               throw new Error('Media permission denied or hardware unavailable.');
+            }
+
+            // 2. Initialize Peer explicitly
+            const peer = createPeer(mediaStream);
+            if (!peer) throw new Error("Could not instantiate WebRTC Peer");
+
+            if (!callerSignal) throw new Error("No incoming signal found");
             await peer.setRemoteDescription(new RTCSessionDescription(callerSignal));
             flushIceCandidates();
 
             const answer = await peer.createAnswer();
             await peer.setLocalDescription(answer);
 
-            socket.emit('answerCall', { signal: peer.localDescription, to: callerId });
+            socket.emit('answerCall', { signal: answer, to: callerId });
             setCallAccepted(true);
             setConnectionState('connecting');
             logger.log('Answer sent to', callerId);
         } catch (e) {
             logger.error('answerCall failed:', e);
-            setMediaError('Failed to answer the call. Please try again.');
+            setMediaError('Failed to pick up: ' + (e.message || 'Network error'));
         }
     }, [callerId, callerSignal, socketRef, flushIceCandidates]);
 

@@ -45,7 +45,7 @@ const getDocuments = asyncHandler(async (req, res) => {
 
     // Check if user is member (or owner) — use string comparison for ObjectIds
     const userId = req.user.id.toString();
-    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
+    const isMember = team.members.some(m => m && m.toString() === userId) || team.owner.toString() === userId;
     if (!isMember) {
         res.status(401);
         throw new Error('Not authorized to access this team files');
@@ -109,7 +109,7 @@ const uploadDocument = asyncHandler(async (req, res) => {
 
     // Verify the uploader is a team member or owner
     const userId = req.user.id.toString();
-    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
+    const isMember = team.members.some(m => m && m.toString() === userId) || team.owner.toString() === userId;
     if (!isMember) {
         if (req.file) {
             try { fs.unlinkSync(req.file.path); } catch (_) { }
@@ -132,6 +132,7 @@ const uploadDocument = asyncHandler(async (req, res) => {
     // Trigger Notification for the team
     const io = req.app.get('socketio');
     const recipientIds = [...team.members, team.owner]
+        .filter(id => id != null)
         .map(id => id.toString())
         .filter(id => id !== req.user.id.toString());
 
@@ -265,7 +266,7 @@ const downloadDocument = asyncHandler(async (req, res) => {
     }
 
     const userId = req.user.id.toString();
-    const isMember = team.members.some(m => m.toString() === userId) || team.owner.toString() === userId;
+    const isMember = team.members.some(m => m && m.toString() === userId) || team.owner.toString() === userId;
     if (!isMember) {
         res.status(403);
         throw new Error('Not authorized to download this file');

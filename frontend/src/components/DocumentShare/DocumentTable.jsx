@@ -37,7 +37,7 @@ const DocumentTable = ({ loading, filteredDocs, handleDelete, handleDownload, ha
                                                 </div>
                                                 <div className="ml-4">
                                                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[200px]" title={doc.name}>{doc.name}</div>
-                                                    <div className="text-xs text-gray-500">{doc.type.toUpperCase()} File</div>
+                                                    <div className="text-xs text-gray-500">{(doc.type || 'unknown').toUpperCase()} File</div>
                                                 </div>
                                             </div>
                                         </td>

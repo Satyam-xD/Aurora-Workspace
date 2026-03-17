@@ -6,6 +6,13 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../hooks/useNotifications/useNotifications';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
 const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -43,27 +50,33 @@ const Header = () => {
     };
   }, [showUserMenu]);
 
-  const navItems = [
-    { path: '/', icon: Home, label: 'Home' },
-    { path: '/video-call', icon: Video, label: 'Meet' },
-    { path: '/chat', icon: MessageCircle, label: 'Chat' },
-    { path: '/document-share', icon: FileText, label: 'Docs' },
-    { path: '/password-manager', icon: Lock, label: 'Vault' },
-    { path: '/kanban', icon: Kanban, label: 'Board' },
-    { path: '/calendar', icon: Calendar, label: 'Calendar' },
-    { path: '/team-management', icon: Users, label: 'Team' }
-  ];
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
-  const publicNavItems = [
-    { path: '/', icon: Home, label: 'Home' },
-    { path: '/login', icon: LogIn, label: 'Login' }
-  ];
-
-  if (user?.role === 'master') {
-    navItems.push({ path: '/master-dashboard', icon: Shield, label: 'Master' });
-  }
-
-  const currentNavItems = user ? navItems : publicNavItems;
+  const currentNavItems = React.useMemo(() => {
+    if (!user) {
+      return [
+        { path: '/', icon: Home, label: 'Home' },
+        { path: '/login', icon: LogIn, label: 'Login' }
+      ];
+    }
+    const items = [
+      { path: '/', icon: Home, label: 'Home' },
+      { path: '/video-call', icon: Video, label: 'Meet' },
+      { path: '/chat', icon: MessageCircle, label: 'Chat' },
+      { path: '/document-share', icon: FileText, label: 'Docs' },
+      { path: '/password-manager', icon: Lock, label: 'Vault' },
+      { path: '/kanban', icon: Kanban, label: 'Board' },
+      { path: '/calendar', icon: Calendar, label: 'Calendar' },
+      { path: '/team-management', icon: Users, label: 'Team' }
+    ];
+    if (user.role === 'master') {
+      items.push({ path: '/master-dashboard', icon: Shield, label: 'Master' });
+    }
+    return items;
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -71,12 +84,7 @@ const Header = () => {
     setShowUserMenu(false);
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  };
+  const initials = React.useMemo(() => getInitials(user?.name), [user?.name]);
 
   return (
     <header
@@ -153,6 +161,7 @@ const Header = () => {
                   </motion.div>
                   {unreadCount > 0 && (
                     <span className="absolute top-2 right-2.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full ring-2 ring-white dark:ring-gray-900 animate-pulse">
+                      <span className="sr-only">{unreadCount} unread notifications</span>
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -175,7 +184,7 @@ const Header = () => {
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-[2px] rounded-full">
                       <div className="w-full h-full bg-white dark:bg-gray-900 rounded-full flex items-center justify-center">
                         <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-inner">
-                          {getInitials(user?.name)}
+                          {initials}
                         </div>
                       </div>
                     </div>

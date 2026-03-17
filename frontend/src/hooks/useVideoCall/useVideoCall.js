@@ -489,10 +489,7 @@ export const useVideoCall = () => {
                     logger.log(`Negotiation needed for ${userName}, creating offer`);
                     makingOfferRef.current.set(userId, true);
 
-                    const offer = await peer.createOffer({
-                        offerToReceiveAudio: true,
-                        offerToReceiveVideo: true
-                    });
+                    const offer = await peer.createOffer();
 
                     if (peer.signalingState !== 'stable') {
                         makingOfferRef.current.set(userId, false);

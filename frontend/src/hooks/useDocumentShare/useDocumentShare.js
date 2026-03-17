@@ -240,12 +240,12 @@ export const useDocumentShare = () => {
         }
     };
 
-    const filteredDocs = documents.filter(doc =>
-        doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredDocs = (documents || []).filter(doc =>
+        doc?.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const filteredFolders = folders.filter(f =>
-        f.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredFolders = (folders || []).filter(f =>
+        f?.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return {

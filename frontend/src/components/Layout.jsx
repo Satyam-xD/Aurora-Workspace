@@ -40,6 +40,7 @@ const Layout = ({ children }) => {
             callerName={call?.name}
             callerId={call?.from}
             userToCall={call?.userToCall}
+            iceCandidates={call?.iceCandidates}
             onEndCall={endCall}
             onAnswer={answerCall}
             isVideoCall={call?.isVideo !== false} // Default to true if undefined

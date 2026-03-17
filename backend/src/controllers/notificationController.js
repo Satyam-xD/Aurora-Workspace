@@ -1,6 +1,14 @@
 import asyncHandler from 'express-async-handler';
 import Notification from '../models/Notification.js';
 
+// @desc    Get unread notification count (lightweight for header badge)
+// @route   GET /api/notifications/count
+// @access  Private
+export const getUnreadCount = asyncHandler(async (req, res) => {
+    const count = await Notification.countDocuments({ recipient: req.user._id, read: false });
+    res.json({ count });
+});
+
 // @desc    Get user notifications
 // @route   GET /api/notifications
 // @access  Private

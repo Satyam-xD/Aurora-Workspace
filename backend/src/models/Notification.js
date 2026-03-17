@@ -20,7 +20,7 @@ const notificationSchema = mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['task_assigned', 'task_updated', 'event_created', 'event_reminder', 'document_shared', 'team_update'],
+        enum: ['task_assigned', 'task_updated', 'event_created', 'event_reminder', 'document_shared', 'team_update', 'message', 'deadline'],
         required: true
     },
     link: {
